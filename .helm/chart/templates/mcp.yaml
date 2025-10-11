@@ -36,8 +36,6 @@ spec:
                 name: mcp-config
           ports:
             - containerPort: 80
-          resources: {}
-              mountPath: /root/.kube # Path in the container
       restartPolicy: Always
 ---
 apiVersion: v1

@@ -1,9 +1,8 @@
 global:
-  image: myrepo/chatbot
-  tag: mcp-6b7440e1dbe8b79555dbb6680fb7972a25463559
+  image: myteslamate/tesla_mcp
+  tag: mcp-9d17620f62ee63e90b8c263fe62e107a10972525
 
 host: localhost
 
 keys:
-  OPENAI_API_KEY: ""
-  DEEPSEEK_API_KEY: ""
+  API_HOST: "https://api.myteslamate.com/"
