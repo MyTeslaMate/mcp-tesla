@@ -1,0 +1,9 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mcp-config
+data:
+  OPENAI_API_KEY: "{{ .Values.keys.OPENAI_API_KEY }}"
+  DEEPSEEK_API_KEY: "{{ .Values.keys.DEEPSEEK_API_KEY }}"
+---

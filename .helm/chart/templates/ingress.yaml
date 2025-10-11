@@ -1,0 +1,15 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: mcp-ingress
+spec:
+  entryPoints:
+    - websecure
+  tls:
+    secretName: app-tls
+  routes:
+      - kind: Rule
+        match: Host(`{{ .Values.host }}`)
+        services:
+          - name: mcp
+            port: 80

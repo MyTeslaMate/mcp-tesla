@@ -1,0 +1,9 @@
+global:
+  image: myrepo/chatbot
+  tag: mcp-6b7440e1dbe8b79555dbb6680fb7972a25463559
+
+host: localhost
+
+keys:
+  OPENAI_API_KEY: ""
+  DEEPSEEK_API_KEY: ""
