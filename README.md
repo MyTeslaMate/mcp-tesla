@@ -1,20 +1,77 @@
-# Tesla Fleet API MCP Server
+# MyTeslaMate MCP Server
 
-This workspace exposes a [Model Context Protocol](https://github.com/modelcontextprotocol/spec) server that wraps the
+This repository provides a [Model Context Protocol](https://github.com/modelcontextprotocol/spec) server that wraps the
 Tesla Fleet API, including vehicle endpoints, vehicle commands, energy endpoints (Powerwall/Solar), and charging endpoints. 
 The implementation is modular and fully featured with **108 MCP tools**.
 
-## Supported APIs
+## 🚀 Quick Start - Use Directly in VS Code, Claude, etc.
 
-This MCP server works with both:
+**No installation required!** Use the hosted MCP server directly:
 
-### 🔧 MyTeslaMate API (Default)
+### For VS Code / Cursor (with MCP Extension) and Other MCP Clients
+Add to your `.vscode/mcp.json` configuration:
+```json
+{
+  "servers": {
+    "tesla": {
+      "type": "http",
+      "url": "https://mcp.myteslamate.com/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_MYTESLAMATE_TOKEN"
+      }
+    }
+  }
+}
+```
+
+### For Claude Desktop
+Add to your `claude_desktop_config.json`:
+```json
+{
+  "mcpServers": {
+    "myteslamate": {
+      "type": "http",
+      "url": "https://mcp.myteslamate.com/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_MYTESLAMATE_TOKEN"
+      }
+    }
+  }
+}
+```
+
+
+### 🔑 Getting Your Token
+1. Visit [MyTeslaMate.com](https://myteslamate.com)
+2. Sign in with your Tesla account  
+3. Navigate to the API section in your dashboard
+4. Copy your personal API token
+5. Use it in your MCP configuration (some clients handle authentication automatically)
+
+## ✨ What You Can Do
+
+Once configured, you can control your Tesla directly from your favorite MCP-enabled application:
+
+- **🚗 Vehicle Control**: Lock/unlock, start climate, open trunk, flash lights
+- **🔋 Charging**: Start/stop charging, set charge limits, schedule charging
+- **📍 Location**: Get vehicle location, send navigation destinations  
+- **🌡️ Climate**: Set temperature, seat heaters, steering wheel heater
+- **🛡️ Security**: Sentry mode, valet mode, speed limits
+- **⚡ Energy**: Monitor Powerwall/Solar (if you have Tesla Energy products)
+- **📊 Data**: Get vehicle data, charging history, energy usage
+
+Just ask in natural language: *"Lock my Tesla"*, *"Set the charge limit to 80%"*, *"Turn on the seat heater"*, etc.
+
+## 🔧 Self-Hosting (Advanced)
+
+If you prefer to run your own instance, this repository also supports:
+
+### MyTeslaMate API (Recommended)
 - **Base URL**: `https://api.myteslamate.com`
 - Simplified authentication and proxy to Tesla's official API
-- Perfect for development and testing
 - No Tesla Developer Account required
 
-### 🏭 Tesla Fleet API (Official)
+### Tesla Fleet API (Official)
 Choose the appropriate regional endpoint:
 
 - **North America, Asia-Pacific** (excluding China): `https://fleet-api.prd.na.vn.cloud.tesla.com`
@@ -87,6 +144,8 @@ Requires Tesla Developer Account and proper Fleet API registration.
 
 ## Configuration
 
+### Authentication
+
 The server does **not** manage authentication. The bearer token must be provided
 via the `Authorization` header when connecting to the MCP server. Configure your
 MCP client to include:
@@ -104,8 +163,35 @@ MCP client to include:
 }
 ```
 
-The Tesla Fleet API base URL is read from the `TESLA_BASE_URL` environment
-variable and falls back to `https://api.myteslamate.com` when unset.
+### API Endpoint Configuration
+
+Configure the Tesla API base URL using the `TESLA_BASE_URL` environment variable:
+
+#### For MyTeslaMate API (Default)
+```bash
+# No configuration needed - uses default
+# Or explicitly set:
+export TESLA_BASE_URL=https://api.myteslamate.com
+```
+
+#### For Tesla Fleet API (Official)
+Choose your regional endpoint:
+
+```bash
+# North America, Asia-Pacific (excluding China)
+export TESLA_BASE_URL=https://fleet-api.prd.na.vn.cloud.tesla.com
+
+# Europe, Middle East, Africa  
+export TESLA_BASE_URL=https://fleet-api.prd.eu.vn.cloud.tesla.com
+
+# China
+export TESLA_BASE_URL=https://fleet-api.prd.cn.vn.cloud.tesla.cn
+```
+
+**Note**: When using the official Tesla Fleet API, ensure you have:
+- A registered Tesla Developer Account
+- Proper Fleet API access permissions
+- Valid OAuth 2.0 bearer tokens
 
 ## Installation
 
@@ -117,13 +203,63 @@ pip install -r requirements.txt
 
 ## Running the MCP server
 
+You can start the server in multiple ways:
+
+### Option 1: Using uvicorn (Recommended)
+```bash
+uvicorn tesla_mcp.app:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### Option 2: Docker compose method
+```bash
+make up
+```
+
+### Option 3: Legacy method
 ```bash
 python server.py
 ```
 
-The server will start using Server-Sent Events (SSE). Connect your MCP-compatible
+The server will start using HTTP Streaming on `http://0.0.0.0:8084`. Connect your MCP-compatible
 client (such as Cursor or VS Code with the MCP extension) and configure a server
-entry that points to this script.
+entry that points to this endpoint.
+
+## Usage Examples
+
+### Quick Start with MyTeslaMate
+```bash
+# 1. Start the server (uses MyTeslaMate API by default)
+uvicorn tesla_mcp.app:app --host 0.0.0.0 --port 8000
+
+# 2. Configure your MCP client with:
+# URL: http://localhost:8000/sse
+# Authorization: Bearer YOUR_MYTESLAMATE_TOKEN
+```
+
+### Using Tesla Fleet API (Official)
+```bash
+# 1. Set your regional endpoint
+export TESLA_BASE_URL=https://fleet-api.prd.na.vn.cloud.tesla.com
+
+# 2. Start the server
+uvicorn tesla_mcp.app:app --host 0.0.0.0 --port 8000
+
+# 3. Configure your MCP client with:
+# URL: http://localhost:8000/sse  
+# Authorization: Bearer YOUR_TESLA_FLEET_TOKEN
+```
+
+### Docker Usage
+```bash
+# Build the image
+docker build -t tesla-mcp .
+
+# Run with MyTeslaMate (default)
+docker run -p 8000:8000 tesla-mcp
+
+# Run with Tesla Fleet API
+docker run -p 8000:8000 -e TESLA_BASE_URL=https://fleet-api.prd.na.vn.cloud.tesla.com tesla-mcp
+```
 
 ## Adding new modules
 
