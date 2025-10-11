@@ -5,6 +5,7 @@ from .commands import VehicleCommandsModule
 from .energy import EnergyModule
 from .charging import ChargingModule
 from .user import UserModule
+from .teslamateapi import TeslaMateAPIModule
 
 __all__ = [
     "VehicleEndpoints",
@@ -12,4 +13,5 @@ __all__ = [
     "EnergyModule",
     "ChargingModule",
     "UserModule",
+    "TeslaMateAPIModule",
 ]

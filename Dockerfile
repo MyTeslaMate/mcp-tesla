@@ -3,7 +3,6 @@ FROM python:3.10
 WORKDIR /code
 
 RUN apt update
-#RUN apt install -y rustc
 
 #RUN pip install --upgrade pip
 

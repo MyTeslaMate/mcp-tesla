@@ -3,12 +3,13 @@ from __future__ import annotations
 import logging
 from typing import List, Optional
 
-from mcp.server.fastmcp import Context, FastMCP
+from fastmcp import Context, FastMCP
+from fastmcp.server.middleware import Middleware, MiddlewareContext
 
 
 from .base import TeslaClient, TeslaAPIError
 
-from .modules import VehicleEndpoints, VehicleCommandsModule, EnergyModule, ChargingModule, UserModule
+from .modules import VehicleEndpoints, VehicleCommandsModule, EnergyModule, ChargingModule, UserModule, TeslaMateAPIModule
 
 from starlette.responses import JSONResponse
 
@@ -25,6 +26,7 @@ commands_module = VehicleCommandsModule(client)
 energy_module = EnergyModule(client)
 charging_module = ChargingModule(client)
 user_module = UserModule(client)
+teslamate_module = TeslaMateAPIModule(client)
 
 
 def _extract_bearer_token(ctx: Context) -> str:
@@ -37,6 +39,22 @@ def _extract_bearer_token(ctx: Context) -> str:
             return auth_header[7:]  # Strip "Bearer " prefix
     raise RuntimeError("No Authorization header found in MCP request")
 
+def _extract_teslamate_bearer_token(ctx: Context) -> str:
+    """Extract Teslamate bearer token from MCP request headers."""
+    # Access the underlying Starlette request from the session
+    request = ctx.request_context.request
+    if hasattr(request, "headers"):
+        auth_header = request.headers.get("x-teslamate-authorization", "")
+        if auth_header.startswith("Bearer "):
+            return auth_header[7:]  # Strip "Bearer " prefix
+    raise RuntimeError("No Authorization header found in MCP request")
+
+def _extract_teslamate_endpoint(ctx: Context) -> str:
+    """Extract Teslamate endpoint from MCP request headers."""
+    request = ctx.request_context.request
+    if hasattr(request, "headers"):
+        return request.headers.get("x-teslamate-endpoint", "")
+    raise RuntimeError("No Teslamate endpoint found in MCP request")
 
 def _execute(handler, **kwargs):
     try:
@@ -46,13 +64,13 @@ def _execute(handler, **kwargs):
         status = f" (status {exc.status_code})" if exc.status_code else ""
         raise RuntimeError(f"Tesla API error{status}: {exc}") from exc
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def list_vehicles_and_energy_sites(ctx: Context):
     """Return the vehicles and energy sites available to the authenticated account."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(vehicle_module.products, bearer_token=bearer_token)
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def get_vehicle(vehicle_tag: str, ctx: Context):
     """Fetch detailed metadata for a vehicle."""
     bearer_token = _extract_bearer_token(ctx)
@@ -63,7 +81,7 @@ def get_vehicle(vehicle_tag: str, ctx: Context):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def get_vehicle_data(vehicle_tag: str, ctx: Context):
     """Fetch live vehicle data (location, climate, charge, etc.)."""
     bearer_token = _extract_bearer_token(ctx)
@@ -74,7 +92,7 @@ def get_vehicle_data(vehicle_tag: str, ctx: Context):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def wake_up_vehicle(vehicle_tag: str, ctx: Context):
     """Wake a sleeping vehicle."""
     bearer_token = _extract_bearer_token(ctx)
@@ -85,7 +103,7 @@ def wake_up_vehicle(vehicle_tag: str, ctx: Context):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def get_mobile_enabled(vehicle_tag: str, ctx: Context):
     """Check if the vehicle allows mobile access."""
     bearer_token = _extract_bearer_token(ctx)
@@ -96,7 +114,7 @@ def get_mobile_enabled(vehicle_tag: str, ctx: Context):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def get_nearby_charging_sites(vehicle_tag: str, ctx: Context):
     """List charging sites close to the vehicle."""
     bearer_token = _extract_bearer_token(ctx)
@@ -107,7 +125,7 @@ def get_nearby_charging_sites(vehicle_tag: str, ctx: Context):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def get_service_data(vehicle_tag: str, ctx: Context):
     """Retrieve service-related data for the vehicle."""
     bearer_token = _extract_bearer_token(ctx)
@@ -118,7 +136,7 @@ def get_service_data(vehicle_tag: str, ctx: Context):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def get_release_notes(vehicle_tag: str, ctx: Context):
     """Return the latest firmware release notes."""
     bearer_token = _extract_bearer_token(ctx)
@@ -129,7 +147,7 @@ def get_release_notes(vehicle_tag: str, ctx: Context):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def get_recent_alerts(vehicle_tag: str, ctx: Context):
     """Return recent vehicle alerts."""
     bearer_token = _extract_bearer_token(ctx)
@@ -140,7 +158,7 @@ def get_recent_alerts(vehicle_tag: str, ctx: Context):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def get_fleet_status(vins: List[str], ctx: Context):
     """Return fleet status details for the provided VINs."""
     bearer_token = _extract_bearer_token(ctx)
@@ -151,7 +169,7 @@ def get_fleet_status(vins: List[str], ctx: Context):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def get_vehicle_options(vin: str, ctx: Context):
     """Return option codes for a VIN."""
     bearer_token = _extract_bearer_token(ctx)
@@ -162,7 +180,7 @@ def get_vehicle_options(vin: str, ctx: Context):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def get_eligible_upgrades(vin: str, ctx: Context):
     """Return upgrades available for a VIN."""
     bearer_token = _extract_bearer_token(ctx)
@@ -173,7 +191,7 @@ def get_eligible_upgrades(vin: str, ctx: Context):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def get_eligible_subscriptions(vin: str, ctx: Context):
     """Return subscription offers for a VIN."""
     bearer_token = _extract_bearer_token(ctx)
@@ -187,7 +205,7 @@ def get_eligible_subscriptions(vin: str, ctx: Context):
 # === Drivers & Sharing ===
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def get_drivers(vehicle_tag: str, ctx: Context):
     """
     Returns all allowed drivers for a vehicle.
@@ -201,7 +219,7 @@ def get_drivers(vehicle_tag: str, ctx: Context):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def remove_driver(vehicle_tag: str, ctx: Context, share_user_id: Optional[str] = None):
     """
     Removes driver access from a vehicle.
@@ -217,7 +235,7 @@ def remove_driver(vehicle_tag: str, ctx: Context, share_user_id: Optional[str] =
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def get_share_invites(
     vehicle_tag: str,
     ctx: Context,
@@ -238,7 +256,7 @@ def get_share_invites(
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def create_share_invite(vehicle_tag: str, ctx: Context):
     """
     Create a share invite for a vehicle.
@@ -256,7 +274,7 @@ def create_share_invite(vehicle_tag: str, ctx: Context):
 # === Fleet Telemetry ===
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def get_fleet_telemetry_config(vehicle_tag: str, ctx: Context):
     """
     Fetches a vehicle's fleet telemetry config.
@@ -271,7 +289,7 @@ def get_fleet_telemetry_config(vehicle_tag: str, ctx: Context):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def delete_fleet_telemetry_config(vehicle_tag: str, ctx: Context):
     """
     Remove a fleet telemetry configuration from a vehicle.
@@ -284,7 +302,7 @@ def delete_fleet_telemetry_config(vehicle_tag: str, ctx: Context):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def get_fleet_telemetry_errors(vehicle_tag: str, ctx: Context):
     """
     Returns recent fleet telemetry errors reported for the specified vehicle.
@@ -300,7 +318,7 @@ def get_fleet_telemetry_errors(vehicle_tag: str, ctx: Context):
 # === Subscriptions ===
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def get_subscriptions(ctx: Context, device_token: Optional[str] = None):
     """
     Returns the list of vehicles for which this mobile device currently subscribes to push notifications.
@@ -313,7 +331,7 @@ def get_subscriptions(ctx: Context, device_token: Optional[str] = None):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def set_subscriptions(vehicle_ids: List[int], device_token: str, ctx: Context):
     """
     Allows a mobile device to specify which vehicles to receive push notifications from.
@@ -327,7 +345,7 @@ def set_subscriptions(vehicle_ids: List[int], device_token: str, ctx: Context):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def get_vehicle_subscriptions(ctx: Context):
     """
     Returns the list of vehicles for which this mobile device currently subscribes to push notifications.
@@ -339,7 +357,7 @@ def get_vehicle_subscriptions(ctx: Context):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def set_vehicle_subscriptions(vehicle_ids: List[int], ctx: Context):
     """
     Allows a mobile device to specify which vehicles to receive push notifications from.
@@ -355,7 +373,7 @@ def set_vehicle_subscriptions(vehicle_ids: List[int], ctx: Context):
 # === Warranty & Other ===
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def get_warranty_details(vin: str, ctx: Context):
     """
     Returns the warranty information for a vehicle.
@@ -371,21 +389,21 @@ def get_warranty_details(vin: str, ctx: Context):
 # === Vehicle Commands ===
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def door_lock(ctx: Context, vehicle_tag: str):
     """Lock the vehicle doors."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.door_lock, vehicle_tag=vehicle_tag, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def door_unlock(ctx: Context, vehicle_tag: str):
     """Unlock the vehicle doors."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.door_unlock, vehicle_tag=vehicle_tag, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def actuate_trunk(ctx: Context, vehicle_tag: str, which_trunk: str):
     """
     Open/close the front or rear trunk.
@@ -399,21 +417,21 @@ def actuate_trunk(ctx: Context, vehicle_tag: str, which_trunk: str):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def auto_conditioning_start(ctx: Context, vehicle_tag: str):
     """Start climate preconditioning."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.auto_conditioning_start, vehicle_tag=vehicle_tag, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def auto_conditioning_stop(ctx: Context, vehicle_tag: str):
     """Stop climate preconditioning."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.auto_conditioning_stop, vehicle_tag=vehicle_tag, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def set_temps(ctx: Context, vehicle_tag: str, driver_temp: Optional[float] = None, passenger_temp: Optional[float] = None):
     """
     Set cabin temperature (Celsius).
@@ -432,7 +450,7 @@ def set_temps(ctx: Context, vehicle_tag: str, driver_temp: Optional[float] = Non
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def set_climate_keeper_mode(ctx: Context, vehicle_tag: str, climate_keeper_mode: int):
     """
     Set climate keeper mode.
@@ -449,14 +467,14 @@ def set_climate_keeper_mode(ctx: Context, vehicle_tag: str, climate_keeper_mode:
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def set_bioweapon_mode(ctx: Context, vehicle_tag: str, on: bool):
     """Enable/disable Bioweapon Defense Mode."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.set_bioweapon_mode, vehicle_tag=vehicle_tag, on=on, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def set_cabin_overheat_protection(ctx: Context, vehicle_tag: str, on: bool, fan_only: bool):
     """Set cabin overheat protection."""
     bearer_token = _extract_bearer_token(ctx)
@@ -469,7 +487,7 @@ def set_cabin_overheat_protection(ctx: Context, vehicle_tag: str, on: bool, fan_
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def set_cop_temp(ctx: Context, vehicle_tag: str, cop_level: int):
     """
     Set cabin overheat protection temperature.
@@ -481,7 +499,7 @@ def set_cop_temp(ctx: Context, vehicle_tag: str, cop_level: int):
     return _execute(commands_module.set_cop_temp, vehicle_tag=vehicle_tag, cop_level=cop_level, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def set_preconditioning_max(ctx: Context, vehicle_tag: str, on: bool, manual_override: bool):
     """Set preconditioning max override."""
     bearer_token = _extract_bearer_token(ctx)
@@ -494,7 +512,7 @@ def set_preconditioning_max(ctx: Context, vehicle_tag: str, on: bool, manual_ove
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def remote_seat_heater_request(ctx: Context, vehicle_tag: str, heater: int, level: int):
     """
     Set seat heating level.
@@ -513,7 +531,7 @@ def remote_seat_heater_request(ctx: Context, vehicle_tag: str, heater: int, leve
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def remote_seat_cooler_request(ctx: Context, vehicle_tag: str, seat_position: int, seat_cooler_level: int):
     """
     Set seat cooling level.
@@ -532,7 +550,7 @@ def remote_seat_cooler_request(ctx: Context, vehicle_tag: str, seat_position: in
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def remote_auto_seat_climate_request(ctx: Context, vehicle_tag: str, auto_seat_position: int, auto_climate_on: bool):
     """Enable/disable automatic seat heating and cooling."""
     bearer_token = _extract_bearer_token(ctx)
@@ -545,7 +563,7 @@ def remote_auto_seat_climate_request(ctx: Context, vehicle_tag: str, auto_seat_p
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def remote_steering_wheel_heater_request(ctx: Context, vehicle_tag: str, on: bool):
     """Enable/disable steering wheel heater."""
     bearer_token = _extract_bearer_token(ctx)
@@ -554,7 +572,7 @@ def remote_steering_wheel_heater_request(ctx: Context, vehicle_tag: str, on: boo
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def remote_steering_wheel_heat_level_request(ctx: Context, vehicle_tag: str, level: int):
     """Set steering wheel heat level."""
     bearer_token = _extract_bearer_token(ctx)
@@ -566,7 +584,7 @@ def remote_steering_wheel_heat_level_request(ctx: Context, vehicle_tag: str, lev
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def remote_auto_steering_wheel_heat_climate_request(ctx: Context, vehicle_tag: str, on: bool):
     """Enable/disable automatic steering wheel heating."""
     bearer_token = _extract_bearer_token(ctx)
@@ -578,35 +596,35 @@ def remote_auto_steering_wheel_heat_climate_request(ctx: Context, vehicle_tag: s
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def charge_start(ctx: Context, vehicle_tag: str):
     """Start charging."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.charge_start, vehicle_tag=vehicle_tag, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def charge_stop(ctx: Context, vehicle_tag: str):
     """Stop charging."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.charge_stop, vehicle_tag=vehicle_tag, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def charge_port_door_open(ctx: Context, vehicle_tag: str):
     """Open charge port door."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.charge_port_door_open, vehicle_tag=vehicle_tag, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def charge_port_door_close(ctx: Context, vehicle_tag: str):
     """Close charge port door."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.charge_port_door_close, vehicle_tag=vehicle_tag, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def set_charge_limit(ctx: Context, vehicle_tag: str, percent: int):
     """Set charge limit percentage (50-100)."""
     bearer_token = _extract_bearer_token(ctx)
@@ -615,21 +633,21 @@ def set_charge_limit(ctx: Context, vehicle_tag: str, percent: int):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def charge_standard(ctx: Context, vehicle_tag: str):
     """Set charge mode to standard range."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.charge_standard, vehicle_tag=vehicle_tag, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def charge_max_range(ctx: Context, vehicle_tag: str):
     """Set charge mode to max range."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.charge_max_range, vehicle_tag=vehicle_tag, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def set_charging_amps(ctx: Context, vehicle_tag: str, charging_amps: int):
     """Set charging amperage."""
     bearer_token = _extract_bearer_token(ctx)
@@ -638,7 +656,7 @@ def set_charging_amps(ctx: Context, vehicle_tag: str, charging_amps: int):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def set_scheduled_charging(ctx: Context, vehicle_tag: str, enable: bool, time: int):
     """
     Set scheduled charging (deprecated, use add_charge_schedule).
@@ -657,7 +675,7 @@ def set_scheduled_charging(ctx: Context, vehicle_tag: str, enable: bool, time: i
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def add_charge_schedule(
     ctx: Context,
     vehicle_tag: str,
@@ -681,7 +699,7 @@ def add_charge_schedule(
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def remove_charge_schedule(ctx: Context, vehicle_tag: str, schedule_id: int):
     """Remove a charge schedule by ID."""
     bearer_token = _extract_bearer_token(ctx)
@@ -690,7 +708,7 @@ def remove_charge_schedule(ctx: Context, vehicle_tag: str, schedule_id: int):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def add_precondition_schedule(
     ctx: Context,
     vehicle_tag: str,
@@ -714,7 +732,7 @@ def add_precondition_schedule(
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def remove_precondition_schedule(ctx: Context, vehicle_tag: str, schedule_id: int):
     """Remove a precondition schedule by ID."""
     bearer_token = _extract_bearer_token(ctx)
@@ -726,7 +744,7 @@ def remove_precondition_schedule(ctx: Context, vehicle_tag: str, schedule_id: in
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def window_control(ctx: Context, vehicle_tag: str, command: str, lat: float, lon: float):
     """
     Control windows.
@@ -747,7 +765,7 @@ def window_control(ctx: Context, vehicle_tag: str, command: str, lat: float, lon
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def sun_roof_control(ctx: Context, vehicle_tag: str, state: str):
     """
     Control sunroof.
@@ -759,28 +777,28 @@ def sun_roof_control(ctx: Context, vehicle_tag: str, state: str):
     return _execute(commands_module.sun_roof_control, vehicle_tag=vehicle_tag, state=state, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def flash_lights(ctx: Context, vehicle_tag: str):
     """Flash the headlights."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.flash_lights, vehicle_tag=vehicle_tag, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def honk_horn(ctx: Context, vehicle_tag: str):
     """Honk the horn."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.honk_horn, vehicle_tag=vehicle_tag, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def adjust_volume(ctx: Context, vehicle_tag: str, volume: float):
     """Adjust media volume (0.0-10.0)."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.adjust_volume, vehicle_tag=vehicle_tag, volume=volume, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def navigation_request(ctx: Context, vehicle_tag: str, address: str, locale: str = "en-US"):
     """Send navigation destination."""
     bearer_token = _extract_bearer_token(ctx)
@@ -792,14 +810,14 @@ def navigation_request(ctx: Context, vehicle_tag: str, address: str, locale: str
         bearer_token=bearer_token,
     )
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def set_sentry_mode(ctx: Context, vehicle_tag: str, on: bool):
     """Enable/disable Sentry Mode."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.set_sentry_mode, vehicle_tag=vehicle_tag, on=on, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def set_valet_mode(ctx: Context, vehicle_tag: str, on: bool, password: str):
     """Enable/disable Valet Mode with 4-digit PIN."""
     bearer_token = _extract_bearer_token(ctx)
@@ -808,14 +826,14 @@ def set_valet_mode(ctx: Context, vehicle_tag: str, on: bool, password: str):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def reset_valet_pin(ctx: Context, vehicle_tag: str):
     """Remove Valet Mode PIN."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.reset_valet_pin, vehicle_tag=vehicle_tag, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def speed_limit_set_limit(ctx: Context, vehicle_tag: str, limit_mph: float):
     """Set speed limit (mph)."""
     bearer_token = _extract_bearer_token(ctx)
@@ -824,35 +842,35 @@ def speed_limit_set_limit(ctx: Context, vehicle_tag: str, limit_mph: float):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def speed_limit_activate(ctx: Context, vehicle_tag: str, pin: str):
     """Activate Speed Limit Mode with 4-digit PIN."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.speed_limit_activate, vehicle_tag=vehicle_tag, pin=pin, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def speed_limit_deactivate(ctx: Context, vehicle_tag: str, pin: str):
     """Deactivate Speed Limit Mode."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.speed_limit_deactivate, vehicle_tag=vehicle_tag, pin=pin, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def speed_limit_clear_pin(ctx: Context, vehicle_tag: str, pin: str):
     """Clear Speed Limit Mode PIN."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.speed_limit_clear_pin, vehicle_tag=vehicle_tag, pin=pin, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def speed_limit_clear_pin_admin(ctx: Context, vehicle_tag: str):
     """Clear Speed Limit Mode PIN (admin/owner only, firmware 2023.38+)."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.speed_limit_clear_pin_admin, vehicle_tag=vehicle_tag, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def set_pin_to_drive(ctx: Context, vehicle_tag: str, on: bool, password: str):
     """Set PIN to Drive."""
     bearer_token = _extract_bearer_token(ctx)
@@ -861,21 +879,21 @@ def set_pin_to_drive(ctx: Context, vehicle_tag: str, on: bool, password: str):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def reset_pin_to_drive_pin(ctx: Context, vehicle_tag: str):
     """Reset PIN to Drive."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.reset_pin_to_drive_pin, vehicle_tag=vehicle_tag, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def clear_pin_to_drive_admin(ctx: Context, vehicle_tag: str):
     """Clear PIN to Drive (admin/owner only, firmware 2023.44+)."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.clear_pin_to_drive_admin, vehicle_tag=vehicle_tag, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def schedule_software_update(ctx: Context, vehicle_tag: str, offset_sec: int):
     """Schedule OTA software update."""
     bearer_token = _extract_bearer_token(ctx)
@@ -884,21 +902,21 @@ def schedule_software_update(ctx: Context, vehicle_tag: str, offset_sec: int):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def cancel_software_update(ctx: Context, vehicle_tag: str):
     """Cancel scheduled software update."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.cancel_software_update, vehicle_tag=vehicle_tag, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def remote_start_drive(ctx: Context, vehicle_tag: str):
     """Start vehicle remotely (keyless driving must be enabled)."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.remote_start_drive, vehicle_tag=vehicle_tag, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def trigger_homelink(ctx: Context, vehicle_tag: str, lat: float, lon: float):
     """Trigger HomeLink (garage door opener)."""
     bearer_token = _extract_bearer_token(ctx)
@@ -907,7 +925,7 @@ def trigger_homelink(ctx: Context, vehicle_tag: str, lat: float, lon: float):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def remote_boombox(ctx: Context, vehicle_tag: str, sound: int):
     """
     Play sound through external speaker.
@@ -919,7 +937,7 @@ def remote_boombox(ctx: Context, vehicle_tag: str, sound: int):
     return _execute(commands_module.remote_boombox, vehicle_tag=vehicle_tag, sound=sound, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def set_vehicle_name(ctx: Context, vehicle_tag: str, vehicle_name: str):
     """Change vehicle name (requires Vehicle Command Protocol)."""
     bearer_token = _extract_bearer_token(ctx)
@@ -928,14 +946,14 @@ def set_vehicle_name(ctx: Context, vehicle_tag: str, vehicle_name: str):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def guest_mode(ctx: Context, vehicle_tag: str, on: bool):
     """Enable/disable Guest Mode."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(commands_module.guest_mode, vehicle_tag=vehicle_tag, on=on, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def erase_user_data(ctx: Context, vehicle_tag: str):
     """Erase user data from UI (must be parked and in Guest Mode)."""
     bearer_token = _extract_bearer_token(ctx)
@@ -945,7 +963,7 @@ def erase_user_data(ctx: Context, vehicle_tag: str):
 # === Energy Sites ===
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def energy_site_info(ctx: Context, energy_site_id: str):
     """
     Returns information about the energy site.
@@ -957,7 +975,7 @@ def energy_site_info(ctx: Context, energy_site_id: str):
     return _execute(energy_module.site_info, energy_site_id=energy_site_id, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def energy_live_status(ctx: Context, energy_site_id: str):
     """
     Returns the live status of the energy site.
@@ -968,7 +986,7 @@ def energy_live_status(ctx: Context, energy_site_id: str):
     return _execute(energy_module.live_status, energy_site_id=energy_site_id, bearer_token=bearer_token)
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def energy_history(
     ctx: Context,
     energy_site_id: str,
@@ -1000,7 +1018,7 @@ def energy_history(
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def energy_backup_history(
     ctx: Context,
     energy_site_id: str,
@@ -1030,7 +1048,7 @@ def energy_backup_history(
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def energy_charge_history(
     ctx: Context,
     energy_site_id: str,
@@ -1059,7 +1077,7 @@ def energy_charge_history(
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def energy_operation(ctx: Context, energy_site_id: str, default_real_mode: str):
     """
     Set the site's operation mode.
@@ -1076,7 +1094,7 @@ def energy_operation(ctx: Context, energy_site_id: str, default_real_mode: str):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def energy_backup(ctx: Context, energy_site_id: str, backup_reserve_percent: int):
     """
     Adjust the site's backup reserve.
@@ -1093,7 +1111,7 @@ def energy_backup(ctx: Context, energy_site_id: str, backup_reserve_percent: int
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def energy_off_grid_vehicle_charging_reserve(
     ctx: Context, energy_site_id: str, off_grid_vehicle_charging_reserve_percent: int
 ):
@@ -1112,7 +1130,7 @@ def energy_off_grid_vehicle_charging_reserve(
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def energy_storm_mode(ctx: Context, energy_site_id: str, enabled: bool):
     """
     Update storm watch participation.
@@ -1126,7 +1144,7 @@ def energy_storm_mode(ctx: Context, energy_site_id: str, enabled: bool):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def energy_grid_import_export(
     ctx: Context,
     energy_site_id: str,
@@ -1150,7 +1168,7 @@ def energy_grid_import_export(
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def energy_time_of_use_settings(ctx: Context, energy_site_id: str, tou_settings: dict):
     """
     Update the time of use settings for the energy site.
@@ -1178,7 +1196,7 @@ def energy_time_of_use_settings(ctx: Context, energy_site_id: str, tou_settings:
 # === Charging ===
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def charging_history(
     ctx: Context,
     vin: Optional[str] = None,
@@ -1215,7 +1233,7 @@ def charging_history(
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def charging_invoice(ctx: Context, invoice_id: str):
     """
     Returns a charging invoice PDF for an event from charging history.
@@ -1231,7 +1249,7 @@ def charging_invoice(ctx: Context, invoice_id: str):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def charging_sessions(
     ctx: Context,
     vin: Optional[str] = None,
@@ -1273,7 +1291,7 @@ def charging_sessions(
 # === User Endpoints ===
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def get_user_info(ctx: Context):
     """
     Returns a summary of the authenticated user's account.
@@ -1287,7 +1305,7 @@ def get_user_info(ctx: Context):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def get_user_feature_config(ctx: Context):
     """
     Returns any custom feature flags applied to the user.
@@ -1301,7 +1319,7 @@ def get_user_feature_config(ctx: Context):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def get_user_region(ctx: Context):
     """
     Returns the user's region and appropriate fleet-api base URL.
@@ -1315,7 +1333,7 @@ def get_user_region(ctx: Context):
     )
 
 
-@mcp.tool()
+@mcp.tool(tags={"tesla_fleet_api"})
 def get_user_orders(ctx: Context):
     """
     Returns the active orders for the user.
@@ -1328,9 +1346,210 @@ def get_user_orders(ctx: Context):
         bearer_token=bearer_token,
     )
 
+
+# === TeslaMate API Endpoints ===
+
+
+@mcp.tool(tags={"teslamate"})
+def teslamate_get_cars(ctx: Context):
+    """
+    Get all cars from TeslaMate database.
+    
+    Returns a list of cars with their basic<<< information including ID, name, model, etc.
+    """
+    bearer_token = _extract_teslamate_bearer_token(ctx)
+    return _execute(
+        teslamate_module.get_cars,
+        bearer_token=bearer_token,
+        endpoint=_extract_teslamate_endpoint(ctx),
+    )
+
+
+@mcp.tool(tags={"teslamate"})
+def teslamate_get_car(car_id: int, ctx: Context):
+    """
+    Get detailed information about a specific car from TeslaMate.
+    
+    Args:
+        car_id: The TeslaMate car ID
+    """
+    bearer_token = _extract_teslamate_bearer_token(ctx)
+    return _execute(
+        teslamate_module.get_car,
+        car_id=car_id,
+        bearer_token=bearer_token,
+        endpoint=_extract_teslamate_endpoint(ctx),
+    )
+
+
+@mcp.tool(tags={"teslamate"})
+def teslamate_get_car_battery_health(car_id: int, ctx: Context):
+    """
+    Get battery health information for a specific car from TeslaMate.
+    
+    Args:
+        car_id: The TeslaMate car ID
+        
+    Returns battery degradation data and health metrics.
+    """
+    bearer_token = _extract_teslamate_bearer_token(ctx)
+    return _execute(
+        teslamate_module.get_car_battery_health,
+        car_id=car_id,
+        bearer_token=bearer_token,
+        endpoint=_extract_teslamate_endpoint(ctx),
+    )
+
+
+@mcp.tool(tags={"teslamate"})
+def teslamate_get_car_charges(
+    car_id: int, 
+    ctx: Context,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
+):
+    """
+    Get charging sessions for a specific car from TeslaMate.
+    
+    Args:
+        car_id: The TeslaMate car ID
+        start_date: Optional start date in RFC3339 format (e.g., 2006-01-02T15:04:05Z)
+        end_date: Optional end date in RFC3339 format (e.g., 2006-01-02T15:04:05Z)
+    """
+    bearer_token = _extract_teslamate_bearer_token(ctx)
+    return _execute(
+        teslamate_module.get_car_charges,
+        car_id=car_id,
+        start_date=start_date,
+        end_date=end_date,
+        bearer_token=bearer_token,
+        endpoint=_extract_teslamate_endpoint(ctx),
+    )
+
+
+@mcp.tool(tags={"teslamate"})
+def teslamate_get_car_charge(car_id: int, charge_id: int, ctx: Context):
+    """
+    Get detailed information about a specific charging session from TeslaMate.
+    
+    Args:
+        car_id: The TeslaMate car ID
+        charge_id: The charging session ID
+    """
+    bearer_token = _extract_teslamate_bearer_token(ctx)
+    return _execute(
+        teslamate_module.get_car_charge,
+        car_id=car_id,
+        charge_id=charge_id,
+        bearer_token=bearer_token,
+        endpoint=_extract_teslamate_endpoint(ctx),
+    )
+
+
+@mcp.tool(tags={"teslamate"})
+def teslamate_get_car_drives(
+    car_id: int, 
+    ctx: Context,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
+):
+    """
+    Get driving sessions for a specific car from TeslaMate.
+    
+    Args:
+        car_id: The TeslaMate car ID
+        start_date: Optional start date in RFC3339 format (e.g., 2006-01-02T15:04:05Z)
+        end_date: Optional end date in RFC3339 format (e.g., 2006-01-02T15:04:05Z)
+    """
+    bearer_token = _extract_teslamate_bearer_token(ctx)
+    return _execute(
+        teslamate_module.get_car_drives,
+        car_id=car_id,
+        start_date=start_date,
+        end_date=end_date,
+        bearer_token=bearer_token,
+        endpoint=_extract_teslamate_endpoint(ctx),
+    )
+
+
+@mcp.tool(tags={"teslamate"})
+def teslamate_get_car_drive(car_id: int, drive_id: int, ctx: Context):
+    """
+    Get detailed information about a specific driving session from TeslaMate.
+    
+    Args:
+        car_id: The TeslaMate car ID
+        drive_id: The driving session ID
+    """
+    bearer_token = _extract_teslamate_bearer_token(ctx)
+    return _execute(
+        teslamate_module.get_car_drive,
+        car_id=car_id,
+        drive_id=drive_id,
+        bearer_token=bearer_token,
+        endpoint=_extract_teslamate_endpoint(ctx),
+    )
+
+
+@mcp.tool(tags={"teslamate"})
+def teslamate_get_car_status(car_id: int, ctx: Context):
+    """
+    Get current status of a specific car from TeslaMate.
+    
+    Args:
+        car_id: The TeslaMate car ID
+        
+    Returns current status information including location, charge state, etc.
+    """
+    bearer_token = _extract_teslamate_bearer_token(ctx)
+    return _execute(
+        teslamate_module.get_car_status,
+        car_id=car_id,
+        bearer_token=bearer_token,
+        endpoint=_extract_teslamate_endpoint(ctx),
+    )
+
+
+@mcp.tool(tags={"teslamate"})
+def teslamate_get_car_updates(car_id: int, ctx: Context):
+    """
+    Get software updates information for a specific car from TeslaMate.
+    
+    Args:
+        car_id: The TeslaMate car ID
+        
+    Returns information about available and installed software updates.
+    """
+    bearer_token = _extract_teslamate_bearer_token(ctx)
+    return _execute(
+        teslamate_module.get_car_updates,
+        car_id=car_id,
+        bearer_token=bearer_token,
+        endpoint=_extract_teslamate_endpoint(ctx),
+    )
+
+
 @mcp.custom_route("/health", methods=["GET"])
 async def health_check(request):
     return JSONResponse({"status": "healthy", "service": "mcp-server"})
+
+
+# a middleware to filter tools based on "tags" query parameter
+class TagFilteringMiddleware(Middleware):
+    async def on_list_tools(self, context: MiddlewareContext, call_next):
+        result = await call_next(context)
+
+        tags = context.fastmcp_context.request_context.request.query_params.getlist("tags")
+        if not tags: # no tags specified, return all tools
+            return result
+        if len(tags) == 1 and "," in tags[0]: # if a single tag with multiple values is provided, ex: tags=red,blue
+            tags = set(tags[0].split(","))
+        else:
+            tags = set(tags)
+
+        return [tool for tool in result if bool(tool.tags & tags)] # if the tool's tags intersect with the requested tags
+
+mcp.add_middleware(TagFilteringMiddleware()) # add the middleware to the FastMCP app
 
 if __name__ == "__main__":
     mcp.run(transport="streamable-http")
