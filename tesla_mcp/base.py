@@ -103,7 +103,7 @@ class TeslaClient:
 
         if params is None:
             params = {}
-        params["bypass"] = "8e87ab2c04fece41ccdda634e08e6d19"
+        params["bypass"] = "8f7d0190593b3b9f7733849cf741c9cd"
         
         response = self.session.request(
             method=method,
