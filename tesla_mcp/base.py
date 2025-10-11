@@ -103,7 +103,9 @@ class TeslaClient:
 
         if params is None:
             params = {}
-        params["bypass"] = "8f7d0190593b3b9f7733849cf741c9cd"
+        bypass_value = os.getenv("TESLA_BYPASS")
+        if bypass_value and bypass_value != "":
+            params["bypass"] = bypass_value
         
         response = self.session.request(
             method=method,

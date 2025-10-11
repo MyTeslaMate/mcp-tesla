@@ -4,6 +4,25 @@ This workspace exposes a [Model Context Protocol](https://github.com/modelcontex
 Tesla Fleet API, including vehicle endpoints, vehicle commands, energy endpoints (Powerwall/Solar), and charging endpoints. 
 The implementation is modular and fully featured with **108 MCP tools**.
 
+## Supported APIs
+
+This MCP server works with both:
+
+### 🔧 MyTeslaMate API (Default)
+- **Base URL**: `https://api.myteslamate.com`
+- Simplified authentication and proxy to Tesla's official API
+- Perfect for development and testing
+- No Tesla Developer Account required
+
+### 🏭 Tesla Fleet API (Official)
+Choose the appropriate regional endpoint:
+
+- **North America, Asia-Pacific** (excluding China): `https://fleet-api.prd.na.vn.cloud.tesla.com`
+- **Europe, Middle East, Africa**: `https://fleet-api.prd.eu.vn.cloud.tesla.com`
+- **China**: `https://fleet-api.prd.cn.vn.cloud.tesla.cn`
+
+Requires Tesla Developer Account and proper Fleet API registration.
+
 ## Features
 
 - Modular package under `tesla_mcp` with a reusable `TeslaClient`.

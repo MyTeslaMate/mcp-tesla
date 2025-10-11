@@ -5,4 +5,5 @@ global:
 host: localhost
 
 keys:
-  API_HOST: "https://api.myteslamate.com/"
+  TESLA_BASE_URL: "https://api.myteslamate.com/"
+  TESLA_BYPASS: ""
