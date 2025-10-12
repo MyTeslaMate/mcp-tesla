@@ -1,4 +1,4 @@
-# MyTeslaMate MCP Server
+# Tesla MCP Server: https://mcp.myteslamate.com/mcp
 
 This repository provides a [Model Context Protocol](https://github.com/modelcontextprotocol/spec) server that wraps both the Tesla Fleet API and the MyTeslaMate API. It includes vehicle endpoints, vehicle commands, energy endpoints (Powerwall/Solar), and charging endpoints. The implementation is modular and fully featured, exposing **98 MCP tools** for the Tesla Fleet API and **9 MCP tools** for the TeslaMate API.
 
