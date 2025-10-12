@@ -281,4 +281,4 @@ docker run -p 8000:8000 -e TESLA_BASE_URL=https://fleet-api.prd.na.vn.cloud.tesl
 - Expose new MCP tools inside `server.py` that delegate to the module methods.
 
 This structure keeps the MCP layer thin while centralising all Tesla Fleet API
-logic in the `tesla_mcp` package.
+and TeslaMate API logic in the `tesla_mcp` package.
