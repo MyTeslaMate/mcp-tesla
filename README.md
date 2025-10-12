@@ -6,39 +6,64 @@ The implementation is modular and fully featured with **108 MCP tools**.
 
 ## 🚀 Quick Start - Use Directly in VS Code, Claude, etc.
 
-**No installation required!** Use the hosted MCP server directly:
+**No installation required!** Use the hosted MCP server directly for either Tesla Fleet API or MyTeslaMate API:
 
 ### For VS Code / Cursor (with MCP Extension) and Other MCP Clients
-Add to your `.vscode/mcp.json` configuration:
+
+Add both endpoints to your `.vscode/mcp.json` configuration to choose your preferred integration:
+
 ```json
 {
   "servers": {
-    "tesla": {
+    "tesla_fleet_api": {
       "type": "http",
-      "url": "https://mcp.myteslamate.com/mcp",
+      "url": "https://mcp.myteslamate.com/mcp?tags=tesla_fleet_api",
       "headers": {
         "Authorization": "Bearer YOUR_MYTESLAMATE_TOKEN"
+      }
+    },
+    "teslamate": {
+      "type": "http",
+      "url": "https://mcp.myteslamate.com/mcp?tags=teslamate",
+      "headers": {
+        "X-Teslamate-EndPoint": "https://YOUR_MYTESLAMATE_API_ENDPOINT",
+        "X-Teslamate-Authorization": "Bearer YOUR_MYTESLAMATE_TOKEN"
       }
     }
   }
 }
 ```
 
+- Use `tesla_fleet_api` for direct access to Tesla's official Fleet API.
+- Use `teslamate` for integration via MyTeslaMate API.
+
 ### For Claude Desktop
-Add to your `claude_desktop_config.json`:
+
+Add both endpoints to your `claude_desktop_config.json`:
+
 ```json
 {
   "mcpServers": {
-    "myteslamate": {
+    "tesla_fleet_api": {
       "type": "http",
-      "url": "https://mcp.myteslamate.com/mcp",
+      "url": "https://mcp.myteslamate.com/mcp?tags=tesla_fleet_api",
       "headers": {
         "Authorization": "Bearer YOUR_MYTESLAMATE_TOKEN"
+      }
+    },
+    "teslamate": {
+      "type": "http",
+      "url": "https://mcp.myteslamate.com/mcp?tags=teslamate",
+      "headers": {
+        "X-Teslamate-EndPoint": "https://YOUR_MYTESLAMATE_API_ENDPOINT",
+        "X-Teslamate-Authorization": "Bearer YOUR_MYTESLAMATE_TOKEN"
       }
     }
   }
 }
 ```
+
+Select the server according to your authentication method and API preference.
 
 
 ### 🔑 Getting Your Token
@@ -144,24 +169,6 @@ Requires Tesla Developer Account and proper Fleet API registration.
 
 ## Configuration
 
-### Authentication
-
-The server does **not** manage authentication. The bearer token must be provided
-via the `Authorization` header when connecting to the MCP server. Configure your
-MCP client to include:
-
-```json
-{
-  "servers": {
-    "tesla": {
-      "url": "http://localhost:8000/sse",
-      "headers": {
-        "Authorization": "Bearer YOUR_TOKEN_HERE"
-      }
-    }
-  }
-}
-```
 
 ### API Endpoint Configuration
 
