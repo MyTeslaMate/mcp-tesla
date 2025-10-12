@@ -75,15 +75,23 @@ Select the server according to your authentication method and API preference.
 
 Once configured, you can control your Tesla directly from your favorite MCP-enabled application:
 
-- **🚗 Vehicle Control**: Lock/unlock, start climate, open trunk, flash lights
-- **🔋 Charging**: Start/stop charging, set charge limits, schedule charging
-- **📍 Location**: Get vehicle location, send navigation destinations  
-- **🌡️ Climate**: Set temperature, seat heaters, steering wheel heater
-- **🛡️ Security**: Sentry mode, valet mode, speed limits
-- **⚡ Energy**: Monitor Powerwall/Solar (if you have Tesla Energy products)
+- **🚗 Vehicle Control**: Lock/unlock, start climate, open trunk, flash lights *(Tesla Fleet API only)*
+- **🔋 Charging**: Start/stop charging, set charge limits, schedule charging *(Tesla Fleet API only)*
+- **📍 Location**: Get vehicle location, send navigation destinations *(Tesla Fleet API only)*
+- **🌡️ Climate**: Set temperature, seat heaters, steering wheel heater *(Tesla Fleet API only)*
+- **🛡️ Security**: Sentry mode, valet mode, speed limits *(Tesla Fleet API only)*
+- **⚡ Energy**: Monitor Powerwall/Solar (if you have Tesla Energy products) *(Tesla Fleet API only)*
 - **📊 Data**: Get vehicle data, charging history, energy usage
 
-Just ask in natural language: *"Lock my Tesla"*, *"Set the charge limit to 80%"*, *"Turn on the seat heater"*, etc.
+**With the TeslaMate API**, you can:
+- View live and historical vehicle data (location, state, battery, climate, charging)
+- Access charging history and energy usage
+- Monitor trips and drive statistics
+- Get notifications and alerts
+- Integrate with your self-hosted TeslaMate instance for privacy and advanced analytics
+
+Just ask in natural language: *"Lock my Tesla"*, *"Set the charge limit to 80%"*, *"Turn on the seat heater"*, etc.  
+*(Note: Control commands and some endpoints are only available via the Tesla Fleet API. TeslaMate API focuses on data, history, and analytics.)*
 
 ## 🔧 Self-Hosting (Advanced)
 
