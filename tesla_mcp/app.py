@@ -7,6 +7,7 @@ from fastmcp import Context, FastMCP
 from fastmcp.server.middleware import Middleware, MiddlewareContext
 
 
+from .auth import TeslaFleetProvider
 from .base import TeslaClient, TeslaAPIError
 
 from .modules import VehicleEndpoints, VehicleCommandsModule, EnergyModule, ChargingModule, UserModule, TeslaMateAPIModule
@@ -19,7 +20,20 @@ import os
 logging.basicConfig(level=logging.INFO)
 
 mcp_port = int(os.environ.get("PORT", 8084))
-mcp = FastMCP("Tesla Vehicle MCP", port=mcp_port)
+
+tesla_logger = logging.getLogger("tesla_mcp")
+
+try:
+    auth_provider = TeslaFleetProvider()
+    tesla_logger.info("Tesla Fleet auth provider enabled")
+except ValueError as exc:
+    tesla_logger.warning(
+        "Tesla Fleet auth provider not configured: %s",
+        exc,
+    )
+    auth_provider = None
+
+mcp = FastMCP("Tesla Vehicle MCP", port=mcp_port, auth=auth_provider)
 client = TeslaClient()
 vehicle_module = VehicleEndpoints(client)
 commands_module = VehicleCommandsModule(client)

@@ -187,6 +187,24 @@ export TESLA_BASE_URL=https://fleet-api.prd.eu.vn.cloud.tesla.com
 export TESLA_BASE_URL=https://fleet-api.prd.cn.vn.cloud.tesla.cn
 ```
 
+### Authentication (Tesla Fleet OAuth)
+
+The server ships with a `TeslaFleetProvider` that proxies Tesla's OAuth flow via FastMCP. Provide your Tesla developer credentials and the public URL of this FastMCP server to enable interactive authentication:
+
+```bash
+export TESLA_MCP_AUTH_TESLA_FLEET_CLIENT_ID=your-client-id
+export TESLA_MCP_AUTH_TESLA_FLEET_CLIENT_SECRET=your-client-secret
+export TESLA_MCP_AUTH_TESLA_FLEET_BASE_URL=https://mcp.your-domain.com
+# Optional overrides
+export TESLA_MCP_AUTH_TESLA_FLEET_AUTH_BASE_URL=https://auth.tesla.com
+export TESLA_MCP_AUTH_TESLA_FLEET_API_BASE_URL=$TESLA_BASE_URL
+export TESLA_MCP_AUTH_TESLA_FLEET_REQUIRED_SCOPES="openid offline_access user_data vehicle_device_data vehicle_cmds"
+export TESLA_MCP_AUTH_TESLA_FLEET_AUDIENCE=$TESLA_BASE_URL
+export TESLA_MCP_AUTH_TESLA_FLEET_ALLOWED_CLIENT_REDIRECT_URIS='["http://localhost:*"]'
+```
+
+If these variables are not supplied, the server falls back to accepting raw `Authorization` headers as before.
+
 **Note**: When using the official Tesla Fleet API, ensure you have:
 - A registered Tesla Developer Account
 - Proper Fleet API access permissions
