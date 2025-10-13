@@ -95,21 +95,7 @@ Just ask in natural language: *"Lock my Tesla"*, *"Set the charge limit to 80%"*
 
 ## 🔧 Self-Hosting (Advanced)
 
-If you prefer to run your own instance, this repository also supports:
-
-### MyTeslaMate API (Recommended)
-- **Base URL**: `https://api.myteslamate.com`
-- Simplified authentication and proxy to Tesla's official API
-- No Tesla Developer Account required
-
-### Tesla Fleet API (Official)
-Choose the appropriate regional endpoint:
-
-- **North America, Asia-Pacific** (excluding China): `https://fleet-api.prd.na.vn.cloud.tesla.com`
-- **Europe, Middle East, Africa**: `https://fleet-api.prd.eu.vn.cloud.tesla.com`
-- **China**: `https://fleet-api.prd.cn.vn.cloud.tesla.cn`
-
-Requires Tesla Developer Account and proper Fleet API registration.
+If you prefer to run your own instance, this repository also support MyTeslaMate API and Tesla Fleet API (Requires Tesla Developer Account and proper Fleet API registration).
 
 ## Features
 
