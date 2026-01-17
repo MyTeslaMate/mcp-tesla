@@ -19,7 +19,7 @@ import os
 logging.basicConfig(level=logging.INFO)
 
 mcp_port = int(os.environ.get("PORT", 8084))
-mcp = FastMCP("Tesla Vehicle MCP", port=mcp_port)
+mcp = FastMCP("Tesla Vehicle MCP")
 client = TeslaClient()
 vehicle_module = VehicleEndpoints(client)
 commands_module = VehicleCommandsModule(client)
@@ -1552,6 +1552,6 @@ class TagFilteringMiddleware(Middleware):
 mcp.add_middleware(TagFilteringMiddleware()) # add the middleware to the FastMCP app
 
 if __name__ == "__main__":
-    mcp.run(transport="streamable-http")
+    mcp.run(transport="streamable-http", port=mcp_port)
 else:
     app = mcp.streamable_http_app()
