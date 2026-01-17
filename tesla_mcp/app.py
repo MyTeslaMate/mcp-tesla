@@ -159,7 +159,7 @@ def get_recent_alerts(vehicle_tag: str, ctx: Context):
 
 
 @mcp.tool(tags={"tesla_fleet_api"})
-def get_fleet_status(vins: List[str], ctx: Context):
+def get_fleet_status(vins: list[str], ctx: Context):
     """Return fleet status details for the provided VINs."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(
@@ -332,7 +332,7 @@ def get_subscriptions(ctx: Context, device_token: Optional[str] = None):
 
 
 @mcp.tool(tags={"tesla_fleet_api"})
-def set_subscriptions(vehicle_ids: List[int], device_token: str, ctx: Context):
+def set_subscriptions(vehicle_ids: list[int], device_token: str, ctx: Context):
     """
     Allows a mobile device to specify which vehicles to receive push notifications from.
     """
@@ -358,7 +358,7 @@ def get_vehicle_subscriptions(ctx: Context):
 
 
 @mcp.tool(tags={"tesla_fleet_api"})
-def set_vehicle_subscriptions(vehicle_ids: List[int], ctx: Context):
+def set_vehicle_subscriptions(vehicle_ids: list[int], ctx: Context):
     """
     Allows a mobile device to specify which vehicles to receive push notifications from.
     """
