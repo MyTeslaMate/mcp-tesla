@@ -5,6 +5,7 @@ from typing import List, Optional
 
 from fastmcp import Context, FastMCP
 from fastmcp.server.middleware import Middleware, MiddlewareContext
+from fastmcp.tools.tool import ToolAnnotations
 
 
 from .base import TeslaClient, TeslaAPIError
@@ -64,13 +65,13 @@ def _execute(handler, **kwargs):
         status = f" (status {exc.status_code})" if exc.status_code else ""
         raise RuntimeError(f"Tesla API error{status}: {exc}") from exc
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def list_vehicles_and_energy_sites(ctx: Context):
     """Return the vehicles and energy sites available to the authenticated account."""
     bearer_token = _extract_bearer_token(ctx)
     return _execute(vehicle_module.products, bearer_token=bearer_token)
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def get_vehicle(vehicle_tag: str, ctx: Context):
     """Fetch detailed metadata for a vehicle."""
     bearer_token = _extract_bearer_token(ctx)
@@ -81,7 +82,7 @@ def get_vehicle(vehicle_tag: str, ctx: Context):
     )
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def get_vehicle_data(vehicle_tag: str, ctx: Context):
     """Fetch live vehicle data (location, climate, charge, etc.)."""
     bearer_token = _extract_bearer_token(ctx)
@@ -103,7 +104,7 @@ def wake_up_vehicle(vehicle_tag: str, ctx: Context):
     )
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def get_mobile_enabled(vehicle_tag: str, ctx: Context):
     """Check if the vehicle allows mobile access."""
     bearer_token = _extract_bearer_token(ctx)
@@ -114,7 +115,7 @@ def get_mobile_enabled(vehicle_tag: str, ctx: Context):
     )
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def get_nearby_charging_sites(vehicle_tag: str, ctx: Context):
     """List charging sites close to the vehicle."""
     bearer_token = _extract_bearer_token(ctx)
@@ -125,7 +126,7 @@ def get_nearby_charging_sites(vehicle_tag: str, ctx: Context):
     )
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def get_service_data(vehicle_tag: str, ctx: Context):
     """Retrieve service-related data for the vehicle."""
     bearer_token = _extract_bearer_token(ctx)
@@ -136,7 +137,7 @@ def get_service_data(vehicle_tag: str, ctx: Context):
     )
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def get_release_notes(vehicle_tag: str, ctx: Context):
     """Return the latest firmware release notes."""
     bearer_token = _extract_bearer_token(ctx)
@@ -147,7 +148,7 @@ def get_release_notes(vehicle_tag: str, ctx: Context):
     )
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def get_recent_alerts(vehicle_tag: str, ctx: Context):
     """Return recent vehicle alerts."""
     bearer_token = _extract_bearer_token(ctx)
@@ -158,7 +159,7 @@ def get_recent_alerts(vehicle_tag: str, ctx: Context):
     )
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def get_fleet_status(vins: List[str], ctx: Context):
     """Return fleet status details for the provided VINs."""
     bearer_token = _extract_bearer_token(ctx)
@@ -169,7 +170,7 @@ def get_fleet_status(vins: List[str], ctx: Context):
     )
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def get_vehicle_options(vin: str, ctx: Context):
     """Return option codes for a VIN."""
     bearer_token = _extract_bearer_token(ctx)
@@ -180,7 +181,7 @@ def get_vehicle_options(vin: str, ctx: Context):
     )
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def get_eligible_upgrades(vin: str, ctx: Context):
     """Return upgrades available for a VIN."""
     bearer_token = _extract_bearer_token(ctx)
@@ -191,7 +192,7 @@ def get_eligible_upgrades(vin: str, ctx: Context):
     )
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def get_eligible_subscriptions(vin: str, ctx: Context):
     """Return subscription offers for a VIN."""
     bearer_token = _extract_bearer_token(ctx)
@@ -205,7 +206,7 @@ def get_eligible_subscriptions(vin: str, ctx: Context):
 # === Drivers & Sharing ===
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def get_drivers(vehicle_tag: str, ctx: Context):
     """
     Returns all allowed drivers for a vehicle.
@@ -235,7 +236,7 @@ def remove_driver(vehicle_tag: str, ctx: Context, share_user_id: Optional[str] =
     )
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def get_share_invites(
     vehicle_tag: str,
     ctx: Context,
@@ -274,7 +275,7 @@ def create_share_invite(vehicle_tag: str, ctx: Context):
 # === Fleet Telemetry ===
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def get_fleet_telemetry_config(vehicle_tag: str, ctx: Context):
     """
     Fetches a vehicle's fleet telemetry config.
@@ -302,7 +303,7 @@ def delete_fleet_telemetry_config(vehicle_tag: str, ctx: Context):
     )
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def get_fleet_telemetry_errors(vehicle_tag: str, ctx: Context):
     """
     Returns recent fleet telemetry errors reported for the specified vehicle.
@@ -318,7 +319,7 @@ def get_fleet_telemetry_errors(vehicle_tag: str, ctx: Context):
 # === Subscriptions ===
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def get_subscriptions(ctx: Context, device_token: Optional[str] = None):
     """
     Returns the list of vehicles for which this mobile device currently subscribes to push notifications.
@@ -345,7 +346,7 @@ def set_subscriptions(vehicle_ids: List[int], device_token: str, ctx: Context):
     )
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def get_vehicle_subscriptions(ctx: Context):
     """
     Returns the list of vehicles for which this mobile device currently subscribes to push notifications.
@@ -373,7 +374,7 @@ def set_vehicle_subscriptions(vehicle_ids: List[int], ctx: Context):
 # === Warranty & Other ===
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def get_warranty_details(vin: str, ctx: Context):
     """
     Returns the warranty information for a vehicle.
@@ -963,7 +964,7 @@ def erase_user_data(ctx: Context, vehicle_tag: str):
 # === Energy Sites ===
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def energy_site_info(ctx: Context, energy_site_id: str):
     """
     Returns information about the energy site.
@@ -975,7 +976,7 @@ def energy_site_info(ctx: Context, energy_site_id: str):
     return _execute(energy_module.site_info, energy_site_id=energy_site_id, bearer_token=bearer_token)
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def energy_live_status(ctx: Context, energy_site_id: str):
     """
     Returns the live status of the energy site.
@@ -986,7 +987,7 @@ def energy_live_status(ctx: Context, energy_site_id: str):
     return _execute(energy_module.live_status, energy_site_id=energy_site_id, bearer_token=bearer_token)
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def energy_history(
     ctx: Context,
     energy_site_id: str,
@@ -1018,7 +1019,7 @@ def energy_history(
     )
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def energy_backup_history(
     ctx: Context,
     energy_site_id: str,
@@ -1048,7 +1049,7 @@ def energy_backup_history(
     )
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def energy_charge_history(
     ctx: Context,
     energy_site_id: str,
@@ -1196,7 +1197,7 @@ def energy_time_of_use_settings(ctx: Context, energy_site_id: str, tou_settings:
 # === Charging ===
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def charging_history(
     ctx: Context,
     vin: Optional[str] = None,
@@ -1233,7 +1234,7 @@ def charging_history(
     )
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def charging_invoice(ctx: Context, invoice_id: str):
     """
     Returns a charging invoice PDF for an event from charging history.
@@ -1249,7 +1250,7 @@ def charging_invoice(ctx: Context, invoice_id: str):
     )
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def charging_sessions(
     ctx: Context,
     vin: Optional[str] = None,
@@ -1291,7 +1292,7 @@ def charging_sessions(
 # === User Endpoints ===
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def get_user_info(ctx: Context):
     """
     Returns a summary of the authenticated user's account.
@@ -1305,7 +1306,7 @@ def get_user_info(ctx: Context):
     )
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def get_user_feature_config(ctx: Context):
     """
     Returns any custom feature flags applied to the user.
@@ -1319,7 +1320,7 @@ def get_user_feature_config(ctx: Context):
     )
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def get_user_region(ctx: Context):
     """
     Returns the user's region and appropriate fleet-api base URL.
@@ -1333,7 +1334,7 @@ def get_user_region(ctx: Context):
     )
 
 
-@mcp.tool(tags={"tesla_fleet_api"})
+@mcp.tool(tags={"tesla_fleet_api"}, annotations=ToolAnnotations(readOnlyHint=True))
 def get_user_orders(ctx: Context):
     """
     Returns the active orders for the user.
@@ -1350,7 +1351,7 @@ def get_user_orders(ctx: Context):
 # === TeslaMate API Endpoints ===
 
 
-@mcp.tool(tags={"teslamate"})
+@mcp.tool(tags={"teslamate"}, annotations=ToolAnnotations(readOnlyHint=True))
 def teslamate_get_cars(ctx: Context):
     """
     Get all cars from TeslaMate database.
@@ -1365,7 +1366,7 @@ def teslamate_get_cars(ctx: Context):
     )
 
 
-@mcp.tool(tags={"teslamate"})
+@mcp.tool(tags={"teslamate"}, annotations=ToolAnnotations(readOnlyHint=True))
 def teslamate_get_car(car_id: int, ctx: Context):
     """
     Get detailed information about a specific car from TeslaMate.
@@ -1382,7 +1383,7 @@ def teslamate_get_car(car_id: int, ctx: Context):
     )
 
 
-@mcp.tool(tags={"teslamate"})
+@mcp.tool(tags={"teslamate"}, annotations=ToolAnnotations(readOnlyHint=True))
 def teslamate_get_car_battery_health(car_id: int, ctx: Context):
     """
     Get battery health information for a specific car from TeslaMate.
@@ -1401,7 +1402,7 @@ def teslamate_get_car_battery_health(car_id: int, ctx: Context):
     )
 
 
-@mcp.tool(tags={"teslamate"})
+@mcp.tool(tags={"teslamate"}, annotations=ToolAnnotations(readOnlyHint=True))
 def teslamate_get_car_charges(
     car_id: int, 
     ctx: Context,
@@ -1427,7 +1428,7 @@ def teslamate_get_car_charges(
     )
 
 
-@mcp.tool(tags={"teslamate"})
+@mcp.tool(tags={"teslamate"}, annotations=ToolAnnotations(readOnlyHint=True))
 def teslamate_get_car_charge(car_id: int, charge_id: int, ctx: Context):
     """
     Get detailed information about a specific charging session from TeslaMate.
@@ -1446,7 +1447,7 @@ def teslamate_get_car_charge(car_id: int, charge_id: int, ctx: Context):
     )
 
 
-@mcp.tool(tags={"teslamate"})
+@mcp.tool(tags={"teslamate"}, annotations=ToolAnnotations(readOnlyHint=True))
 def teslamate_get_car_drives(
     car_id: int, 
     ctx: Context,
@@ -1472,7 +1473,7 @@ def teslamate_get_car_drives(
     )
 
 
-@mcp.tool(tags={"teslamate"})
+@mcp.tool(tags={"teslamate"}, annotations=ToolAnnotations(readOnlyHint=True))
 def teslamate_get_car_drive(car_id: int, drive_id: int, ctx: Context):
     """
     Get detailed information about a specific driving session from TeslaMate.
@@ -1491,7 +1492,7 @@ def teslamate_get_car_drive(car_id: int, drive_id: int, ctx: Context):
     )
 
 
-@mcp.tool(tags={"teslamate"})
+@mcp.tool(tags={"teslamate"}, annotations=ToolAnnotations(readOnlyHint=True))
 def teslamate_get_car_status(car_id: int, ctx: Context):
     """
     Get current status of a specific car from TeslaMate.
@@ -1510,7 +1511,7 @@ def teslamate_get_car_status(car_id: int, ctx: Context):
     )
 
 
-@mcp.tool(tags={"teslamate"})
+@mcp.tool(tags={"teslamate"}, annotations=ToolAnnotations(readOnlyHint=True))
 def teslamate_get_car_updates(car_id: int, ctx: Context):
     """
     Get software updates information for a specific car from TeslaMate.
