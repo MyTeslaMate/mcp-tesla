@@ -28,6 +28,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from fastmcp.server.auth import TokenVerifier
 from fastmcp.server.auth.auth import AccessToken
 from fastmcp.server.auth.oauth_proxy import OAuthProxy
+from fastmcp.utilities.storage import InMemoryStorage
+from mcp.server.auth.provider import AuthorizationParams, OAuthClientInformationFull
 
 TESLA_AUTH_URL = "https://auth.tesla.com/oauth2/v3/authorize"
 TESLA_TOKEN_URL = "https://auth.tesla.com/oauth2/v3/token"
@@ -164,4 +166,14 @@ class TeslaProvider(OAuthProxy):
             ),
             base_url=settings.base_url,
             issuer_url=settings.base_url,
+            client_storage=InMemoryStorage(),
         )
+
+    async def authorize(
+        self,
+        client: OAuthClientInformationFull,
+        params: AuthorizationParams,
+    ) -> str:
+        # Tesla does not support RFC 8707 resource indicators — strip it to avoid
+        # "Invalid audience" errors on auth.tesla.com.
+        return await super().authorize(client, params.model_copy(update={"resource": None}))
