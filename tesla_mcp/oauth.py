@@ -28,7 +28,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from fastmcp.server.auth import TokenVerifier
 from fastmcp.server.auth.auth import AccessToken
 from fastmcp.server.auth.oauth_proxy import OAuthProxy
-from fastmcp.utilities.storage import InMemoryStorage
 from mcp.server.auth.provider import AuthorizationParams, OAuthClientInformationFull
 
 TESLA_AUTH_URL = "https://auth.tesla.com/oauth2/v3/authorize"
@@ -166,7 +165,6 @@ class TeslaProvider(OAuthProxy):
             ),
             base_url=settings.base_url,
             issuer_url=settings.base_url,
-            client_storage=InMemoryStorage(),
         )
 
     async def authorize(
