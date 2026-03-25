@@ -6,4 +6,8 @@ metadata:
 data:
   OPENAI_API_KEY: "{{ .Values.keys.OPENAI_API_KEY }}"
   DEEPSEEK_API_KEY: "{{ .Values.keys.DEEPSEEK_API_KEY }}"
+  TESLA_OAUTH_CLIENT_ID: "{{ .Values.keys.TESLA_OAUTH_CLIENT_ID }}"
+  TESLA_OAUTH_CLIENT_SECRET: "{{ .Values.keys.TESLA_OAUTH_CLIENT_SECRET }}"
+  TESLA_OAUTH_BASE_URL: "{{ .Values.keys.TESLA_OAUTH_BASE_URL }}"
+  TESLA_OAUTH_MTM_BASE_URL: "{{ .Values.keys.TESLA_OAUTH_MTM_BASE_URL }}"
 ---

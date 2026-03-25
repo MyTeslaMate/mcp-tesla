@@ -10,6 +10,7 @@ from fastmcp.server.middleware import Middleware, MiddlewareContext
 from .base import TeslaClient, TeslaAPIError
 
 from .modules import VehicleEndpoints, VehicleCommandsModule, EnergyModule, ChargingModule, UserModule, TeslaMateAPIModule
+from .oauth import TeslaProvider, _token_map
 
 from starlette.responses import JSONResponse
 
@@ -19,7 +20,11 @@ import os
 logging.basicConfig(level=logging.INFO)
 
 mcp_port = int(os.environ.get("PORT", 8084))
-mcp = FastMCP("Tesla Vehicle MCP")
+_tesla_oauth_client_id = os.environ.get("TESLA_OAUTH_CLIENT_ID")
+mcp = FastMCP(
+    "Tesla Vehicle MCP",
+    auth=TeslaProvider() if _tesla_oauth_client_id else None,
+)
 client = TeslaClient()
 vehicle_module = VehicleEndpoints(client)
 commands_module = VehicleCommandsModule(client)
@@ -40,14 +45,25 @@ def _extract_bearer_token(ctx: Context) -> str:
     raise RuntimeError("No Authorization header found in MCP request")
 
 def _extract_teslamate_bearer_token(ctx: Context) -> str:
-    """Extract Teslamate bearer token from MCP request headers."""
-    # Access the underlying Starlette request from the session
+    """Extract MyTeslaMate bearer token from MCP request headers.
+
+    In manual mode: reads X-Teslamate-Authorization header directly.
+    In OAuth mode: looks up the MTM token from the Tesla bearer token via _token_map.
+    """
     request = ctx.request_context.request
     if hasattr(request, "headers"):
         auth_header = request.headers.get("x-teslamate-authorization", "")
         if auth_header.startswith("Bearer "):
-            return auth_header[7:]  # Strip "Bearer " prefix
+            return auth_header[7:]
+
+    # OAuth mode: resolve tesla_token → mtm_token
+    tesla_token = _extract_bearer_token(ctx)
+    mtm_token = _token_map.get(tesla_token)
+    if mtm_token:
+        return mtm_token
     raise RuntimeError("No Authorization header found in MCP request")
+    # Fallback: use Tesla token directly
+    #return tesla_token
 
 def _extract_teslamate_endpoint(ctx: Context) -> str:
     """Extract Teslamate endpoint from MCP request headers."""
