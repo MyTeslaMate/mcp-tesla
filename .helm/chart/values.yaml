@@ -7,3 +7,7 @@ host: localhost
 keys:
   TESLA_BASE_URL: "https://api.myteslamate.com/"
   TESLA_BYPASS: ""
+  TESLA_OAUTH_CLIENT_ID: ""
+  TESLA_OAUTH_CLIENT_SECRET: ""
+  TESLA_OAUTH_BASE_URL: ""
+  TESLA_OAUTH_MTM_BASE_URL: ""
