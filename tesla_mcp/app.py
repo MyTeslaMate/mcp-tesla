@@ -1570,4 +1570,4 @@ mcp.add_middleware(TagFilteringMiddleware()) # add the middleware to the FastMCP
 if __name__ == "__main__":
     mcp.run(transport="streamable-http", port=mcp_port)
 else:
-    app = mcp.streamable_http_app()
+    app = mcp.http_app()
