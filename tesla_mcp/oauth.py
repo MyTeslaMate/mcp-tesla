@@ -30,8 +30,8 @@ from fastmcp.server.auth.auth import AccessToken
 from fastmcp.server.auth.oauth_proxy import OAuthProxy
 from mcp.server.auth.provider import AuthorizationParams, OAuthClientInformationFull
 
-TESLA_AUTH_URL = "https://auth.tesla.com/oauth2/v3/authorize"
-TESLA_TOKEN_URL = "https://auth.tesla.com/oauth2/v3/token"
+TESLA_AUTH_URL = "https://fleet-auth.prd.vn.cloud.tesla.com/oauth2/v3/authorize"
+TESLA_TOKEN_URL = "https://fleet-auth.prd.vn.cloud.tesla.com/oauth2/v3/token"
 TESLA_SCOPES = [
     "openid",
     "offline_access",
