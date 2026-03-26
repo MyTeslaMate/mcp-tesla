@@ -44,6 +44,8 @@ def _extract_bearer_token(ctx: Context) -> str:
             return auth_header[7:]  # Strip "Bearer " prefix
     raise RuntimeError("No Authorization header found in MCP request")
 
+logger = logging.getLogger("tesla_mcp")
+
 def _extract_teslamate_bearer_token(ctx: Context) -> str:
     """Extract MyTeslaMate bearer token from MCP request headers.
 
@@ -54,12 +56,15 @@ def _extract_teslamate_bearer_token(ctx: Context) -> str:
     if hasattr(request, "headers"):
         auth_header = request.headers.get("x-teslamate-authorization", "")
         if auth_header.startswith("Bearer "):
-            return auth_header[7:]
+            token = auth_header[7:]
+            logger.info("MTM token (manual): ...%s", token[-6:])
+            return token
 
     # OAuth mode: resolve tesla_token → mtm_token
     tesla_token = _extract_bearer_token(ctx)
     mtm_token = _token_map.get(tesla_token)
     if mtm_token:
+        logger.info("MTM token (oauth): ...%s", mtm_token[-6:])
         return mtm_token
     raise RuntimeError("No Authorization header found in MCP request")
     # Fallback: use Tesla token directly
@@ -76,7 +81,7 @@ def _execute(handler, **kwargs):
     try:
         return handler(**kwargs)
     except TeslaAPIError as exc:  # pragma: no cover - tool surface
-        logging.getLogger("tesla_mcp").error("Tesla API error: %s", exc)
+        logger.error("Tesla API error: %s", exc)
         status = f" (status {exc.status_code})" if exc.status_code else ""
         raise RuntimeError(f"Tesla API error{status}: {exc}") from exc
 
