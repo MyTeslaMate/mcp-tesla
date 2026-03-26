@@ -18,6 +18,7 @@ import os
 
 
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("tesla_mcp")
 
 mcp_port = int(os.environ.get("PORT", 8084))
 _tesla_oauth_client_id = os.environ.get("TESLA_OAUTH_CLIENT_ID")
@@ -35,42 +36,35 @@ teslamate_module = TeslaMateAPIModule(client)
 
 
 def _extract_bearer_token(ctx: Context) -> str:
-    """Extract bearer token from MCP request headers."""
-    # Access the underlying Starlette request from the session
-    request = ctx.request_context.request
-    if hasattr(request, "headers"):
-        auth_header = request.headers.get("authorization", "")
-        if auth_header.startswith("Bearer "):
-            return auth_header[7:]  # Strip "Bearer " prefix
-    raise RuntimeError("No Authorization header found in MCP request")
+    """Extract bearer token from MCP request headers.
 
-logger = logging.getLogger("tesla_mcp")
-
-def _extract_teslamate_bearer_token(ctx: Context) -> str:
-    """Extract MyTeslaMate bearer token from MCP request headers.
-
-    In manual mode: reads X-Teslamate-Authorization header directly.
-    In OAuth mode: looks up the MTM token from the Tesla bearer token via _token_map.
+    In OAuth mode, fastmcp 3.x issues its own JWTs — the MTM token is stored
+    in AccessToken.claims by TeslaTokenVerifier. Return it when available.
+    In manual mode, the Authorization header carries the MTM token directly.
     """
     request = ctx.request_context.request
-    if hasattr(request, "headers"):
-        auth_header = request.headers.get("x-teslamate-authorization", "")
-        if auth_header.startswith("Bearer "):
-            token = auth_header[7:]
-            logger.info("MTM token (manual): ...%s", token[-6:])
-            return token
 
-    # OAuth mode: get MTM token from AccessToken claims (set by TeslaTokenVerifier)
-    user = getattr(request, "user", None)
+    # OAuth mode: get token from AccessToken claims
+    user = getattr(request, "user", None) if hasattr(request, "user") else None
     if user and hasattr(user, "access_token"):
         mtm_token = user.access_token.claims.get("mtm_token")
         if mtm_token:
-            logger.info("MTM token (oauth): ...%s", mtm_token[-6:])
+            logger.info("bearer token (oauth/claims): ...%s", mtm_token[-6:])
             return mtm_token
 
-    raise RuntimeError("No MTM token found in MCP request")
-    # Fallback: use Tesla token directly
-    #return tesla_token
+    # Manual mode: token is in the Authorization header
+    if hasattr(request, "headers"):
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+            logger.info("bearer token (manual/header): ...%s (len=%d)", token[-6:], len(token))
+            return token
+
+    raise RuntimeError("No Authorization header found in MCP request")
+
+def _extract_teslamate_bearer_token(ctx: Context) -> str:
+    """Extract MyTeslaMate bearer token — delegates to _extract_bearer_token."""
+    return _extract_bearer_token(ctx)
 
 def _extract_teslamate_endpoint(ctx: Context) -> str:
     """Extract Teslamate endpoint from MCP request headers."""
