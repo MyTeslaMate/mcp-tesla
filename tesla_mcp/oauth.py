@@ -35,7 +35,9 @@ TESLA_TOKEN_URL = "https://fleet-auth.prd.vn.cloud.tesla.com/oauth2/v3/token"
 TESLA_SCOPES = [
     "openid",
     "offline_access",
+    "user_data",
     "vehicle_device_data",
+    "vehicle_location",
     "vehicle_cmds",
     "vehicle_charging_cmds",
     "energy_device_data",
@@ -165,6 +167,7 @@ class TeslaProvider(OAuthProxy):
             ),
             base_url=settings.base_url,
             issuer_url=settings.base_url,
+            token_endpoint_auth_method="client_secret_post",
         )
 
     async def authorize(
