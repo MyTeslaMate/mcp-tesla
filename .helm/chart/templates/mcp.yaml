@@ -38,7 +38,7 @@ spec:
             - containerPort: 80
           volumeMounts:
             - name: fastmcp-data
-              mountPath: /root/.fastmcp
+              mountPath: /root/.local/share/fastmcp
       volumes:
         - name: fastmcp-data
           hostPath:
