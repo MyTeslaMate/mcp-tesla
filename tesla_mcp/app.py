@@ -49,16 +49,13 @@ def _extract_bearer_token(ctx: Context) -> str:
     if user and hasattr(user, "access_token"):
         mtm_token = user.access_token.claims.get("mtm_token")
         if mtm_token:
-            logger.info("bearer token (oauth/claims): ...%s", mtm_token[-6:])
             return mtm_token
 
     # Manual mode: token is in the Authorization header
     if hasattr(request, "headers"):
         auth_header = request.headers.get("authorization", "")
         if auth_header.startswith("Bearer "):
-            token = auth_header[7:]
-            logger.info("bearer token (manual/header): ...%s (len=%d)", token[-6:], len(token))
-            return token
+            return auth_header[7:]
 
     raise RuntimeError("No Authorization header found in MCP request")
 
