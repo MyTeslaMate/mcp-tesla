@@ -36,6 +36,14 @@ spec:
                 name: mcp-config
           ports:
             - containerPort: 80
+          volumeMounts:
+            - name: fastmcp-data
+              mountPath: /root/.fastmcp
+      volumes:
+        - name: fastmcp-data
+          hostPath:
+            path: /data/mcp-fastmcp
+            type: DirectoryOrCreate
       restartPolicy: Always
 ---
 apiVersion: v1
