@@ -10,7 +10,7 @@ from fastmcp.server.middleware import Middleware, MiddlewareContext
 from .base import TeslaClient, TeslaAPIError
 
 from .modules import VehicleEndpoints, VehicleCommandsModule, EnergyModule, ChargingModule, UserModule, TeslaMateAPIModule
-from .oauth import TeslaProvider, _token_map
+from .oauth import TeslaProvider
 
 from starlette.responses import JSONResponse
 
@@ -60,13 +60,15 @@ def _extract_teslamate_bearer_token(ctx: Context) -> str:
             logger.info("MTM token (manual): ...%s", token[-6:])
             return token
 
-    # OAuth mode: resolve tesla_token → mtm_token
-    tesla_token = _extract_bearer_token(ctx)
-    mtm_token = _token_map.get(tesla_token)
-    if mtm_token:
-        logger.info("MTM token (oauth): ...%s", mtm_token[-6:])
-        return mtm_token
-    raise RuntimeError("No Authorization header found in MCP request")
+    # OAuth mode: get MTM token from AccessToken claims (set by TeslaTokenVerifier)
+    user = getattr(request, "user", None)
+    if user and hasattr(user, "access_token"):
+        mtm_token = user.access_token.claims.get("mtm_token")
+        if mtm_token:
+            logger.info("MTM token (oauth): ...%s", mtm_token[-6:])
+            return mtm_token
+
+    raise RuntimeError("No MTM token found in MCP request")
     # Fallback: use Tesla token directly
     #return tesla_token
 
