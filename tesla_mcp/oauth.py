@@ -65,7 +65,7 @@ class TeslaProviderSettings(BaseSettings):
 class TeslaTokenVerifier(TokenVerifier):
     """Verifies a Tesla access token by exchanging it for a MyTeslaMate token.
 
-    On first use, calls POST /auth/exchange on the MyTeslaMate API with the
+    On first use, calls POST /api/auth/exchange on the MyTeslaMate API with the
     Tesla token. On subsequent requests, serves from the in-memory cache.
     """
 
@@ -87,7 +87,7 @@ class TeslaTokenVerifier(TokenVerifier):
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 r = await client.post(
-                    f"{self.mtm_base_url}/auth/exchange",
+                    f"{self.mtm_base_url}/api/auth/exchange",
                     json={"tesla_token": token},
                 )
                 if r.status_code != 200:
@@ -114,7 +114,7 @@ class TeslaProvider(OAuthProxy):
 
     Handles Dynamic Client Registration for MCP clients (ChatGPT, Claude, etc.),
     proxies the OAuth flow to auth.tesla.com, and exchanges the resulting Tesla
-    token for a MyTeslaMate token via /auth/exchange.
+    token for a MyTeslaMate token via /api/auth/exchange.
 
     Example:
         ```python
