@@ -44,10 +44,10 @@ TESLA_SCOPES = [
     "energy_cmds",
 ]
 
-# In-memory mapping: tesla_token → mtm_token
+# In-memory mapping: tesla_token → {mtm_token, subscribe_api, subscribe_teslamate}
 # Populated by TeslaTokenVerifier on each token verification.
 # Cleared on server restart (acceptable for MVP).
-_token_map: dict[str, str] = {}
+_token_map: dict[str, dict] = {}
 
 
 class TeslaProviderSettings(BaseSettings):
@@ -75,12 +75,17 @@ class TeslaTokenVerifier(TokenVerifier):
 
     async def verify_token(self, token: str) -> AccessToken | None:
         if token in _token_map:
+            cached = _token_map[token]
             return AccessToken(
                 token=token,
                 client_id="cached",
                 scopes=TESLA_SCOPES,
                 expires_at=None,
-                claims={"mtm_token": _token_map[token]},
+                claims={
+                    "mtm_token": cached["mtm_token"],
+                    "subscribe_api": cached["subscribe_api"],
+                    "subscribe_teslamate": cached["subscribe_teslamate"],
+                },
             )
 
         try:
@@ -98,13 +103,23 @@ class TeslaTokenVerifier(TokenVerifier):
         except httpx.RequestError:
             return None
 
-        _token_map[token] = mtm_token
+        subscribe_api = bool(data.get("subscribe_api", False))
+        subscribe_teslamate = bool(data.get("subscribe_teslamate", False))
+        _token_map[token] = {
+            "mtm_token": mtm_token,
+            "subscribe_api": subscribe_api,
+            "subscribe_teslamate": subscribe_teslamate,
+        }
         return AccessToken(
             token=token,
             client_id=str(data.get("user_id", "unknown")),
             scopes=TESLA_SCOPES,
             expires_at=None,
-            claims={"mtm_token": mtm_token},
+            claims={
+                "mtm_token": mtm_token,
+                "subscribe_api": subscribe_api,
+                "subscribe_teslamate": subscribe_teslamate,
+            },
         )
 
 

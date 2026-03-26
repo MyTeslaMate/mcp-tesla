@@ -1548,13 +1548,28 @@ async def health_check(request):
     return JSONResponse({"status": "healthy", "service": "mcp-server"})
 
 
-# a middleware to filter tools based on "tags" query parameter
+# a middleware to filter tools based on subscription flags and "tags" query parameter
 class TagFilteringMiddleware(Middleware):
     async def on_list_tools(self, context: MiddlewareContext, call_next):
         result = await call_next(context)
 
-        tags = context.fastmcp_context.request_context.request.query_params.getlist("tags")
-        if not tags: # no tags specified, return all tools
+        request = context.fastmcp_context.request_context.request
+
+        # Filter by subscription flags from OAuth claims (OAuth mode only)
+        forbidden_tags: set[str] = set()
+        user = getattr(request, "user", None)
+        if user and hasattr(user, "access_token"):
+            claims = user.access_token.claims
+            if not claims.get("subscribe_api", False):
+                forbidden_tags.add("tesla_fleet_api")
+            if not claims.get("subscribe_teslamate", False):
+                forbidden_tags.add("teslamate")
+        if forbidden_tags:
+            result = [tool for tool in result if not (tool.tags & forbidden_tags)]
+
+        # Filter by explicit "tags" query parameter
+        tags = request.query_params.getlist("tags")
+        if not tags: # no tags specified, return all (subscription-filtered) tools
             return result
         if len(tags) == 1 and "," in tags[0]: # if a single tag with multiple values is provided, ex: tags=red,blue
             tags = set(tags[0].split(","))
