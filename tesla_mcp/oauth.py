@@ -83,6 +83,7 @@ class TeslaTokenVerifier(TokenVerifier):
                 claims={"mtm_token": _token_map[token]},
             )
 
+        data: dict = {}
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 r = await client.post(
@@ -90,13 +91,13 @@ class TeslaTokenVerifier(TokenVerifier):
                     json={"tesla_token": token},
                 )
                 if r.status_code != 200:
-                    return None
-                data = r.json()
-                mtm_token = data.get("token")
-                if not mtm_token:
-                    return None
+                    # Fallback: use Tesla token directly
+                    mtm_token = token
+                else:
+                    data = r.json()
+                    mtm_token = data.get("token") or token
         except httpx.RequestError:
-            return None
+            mtm_token = token
 
         _token_map[token] = mtm_token
         return AccessToken(
