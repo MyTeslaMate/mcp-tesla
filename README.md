@@ -1,8 +1,30 @@
 # Tesla MCP Server: https://mcp.myteslamate.com/mcp
 
-This repository provides a [Model Context Protocol](https://github.com/modelcontextprotocol/spec) server that wraps both the Tesla Fleet API and the MyTeslaMate API. It includes vehicle endpoints, vehicle commands, energy endpoints (Powerwall/Solar), and charging endpoints. The implementation is modular and fully featured, exposing **98 MCP tools** for the Tesla Fleet API and **9 MCP tools** for the TeslaMate API.
+This repository provides a [Model Context Protocol](https://github.com/modelcontextprotocol/spec) server that wraps both the Tesla Fleet API and the TeslaMate API. It includes vehicle endpoints, vehicle commands, energy endpoints (Powerwall/Solar), and charging endpoints. The implementation is modular and fully featured, exposing **98 MCP tools** for the Tesla Fleet API and **9 MCP tools** for the TeslaMate API.
 
 ---
+
+## ✨ What You Can Do
+
+Once configured, you can control your Tesla directly from your favorite MCP-enabled application:
+
+- **🚗 Vehicle Control**: Lock/unlock, start climate, open trunk, flash lights *(Tesla Fleet API only)*
+- **🔋 Charging**: Start/stop charging, set charge limits, schedule charging *(Tesla Fleet API only)*
+- **📍 Location**: Get vehicle location, send navigation destinations *(Tesla Fleet API only)*
+- **🌡️ Climate**: Set temperature, seat heaters, steering wheel heater *(Tesla Fleet API only)*
+- **🛡️ Security**: Sentry mode, valet mode, speed limits *(Tesla Fleet API only)*
+- **⚡ Energy**: Monitor Powerwall/Solar (if you have Tesla Energy products) *(Tesla Fleet API only)*
+- **📊 Data**: Get vehicle data, charging history, energy usage
+
+**With the TeslaMate API**, you can:
+- View live and historical vehicle data (location, state, battery, climate, charging)
+- Access charging history and energy usage
+- Monitor trips and drive statistics
+- Get notifications and alerts
+- Integrate with your self-hosted TeslaMate instance for privacy and advanced analytics
+
+Just ask in natural language: *"Lock my Tesla"*, *"Set the charge limit to 80%"*, *"Turn on the seat heater"*, etc.  
+*(Note: Control commands and some endpoints are only available via the Tesla Fleet API. TeslaMate API focuses on data, history, and analytics.)*
 
 ## 🔐 One-Click SSO — Connect with Your Tesla Account
 
@@ -87,7 +109,7 @@ Add both endpoints to your `.vscode/mcp.json` configuration to choose your prefe
 ```
 
 - Use `tesla_fleet_api` for direct access to Tesla's official Fleet API.
-- Use `teslamate` for integration via MyTeslaMate API.
+- Use `teslamate` for integration via TeslaMate API.
 
 #### For Claude Desktop
 
@@ -125,31 +147,10 @@ Select the server according to your authentication method and API preference.
 4. Copy your personal API token
 5. Use it in your MCP configuration
 
-## ✨ What You Can Do
-
-Once configured, you can control your Tesla directly from your favorite MCP-enabled application:
-
-- **🚗 Vehicle Control**: Lock/unlock, start climate, open trunk, flash lights *(Tesla Fleet API only)*
-- **🔋 Charging**: Start/stop charging, set charge limits, schedule charging *(Tesla Fleet API only)*
-- **📍 Location**: Get vehicle location, send navigation destinations *(Tesla Fleet API only)*
-- **🌡️ Climate**: Set temperature, seat heaters, steering wheel heater *(Tesla Fleet API only)*
-- **🛡️ Security**: Sentry mode, valet mode, speed limits *(Tesla Fleet API only)*
-- **⚡ Energy**: Monitor Powerwall/Solar (if you have Tesla Energy products) *(Tesla Fleet API only)*
-- **📊 Data**: Get vehicle data, charging history, energy usage
-
-**With the TeslaMate API**, you can:
-- View live and historical vehicle data (location, state, battery, climate, charging)
-- Access charging history and energy usage
-- Monitor trips and drive statistics
-- Get notifications and alerts
-- Integrate with your self-hosted TeslaMate instance for privacy and advanced analytics
-
-Just ask in natural language: *"Lock my Tesla"*, *"Set the charge limit to 80%"*, *"Turn on the seat heater"*, etc.  
-*(Note: Control commands and some endpoints are only available via the Tesla Fleet API. TeslaMate API focuses on data, history, and analytics.)*
 
 ## 🔧 Self-Hosting (Advanced)
 
-If you prefer to run your own instance, this repository also support MyTeslaMate API and Tesla Fleet API (Requires Tesla Developer Account and proper Fleet API registration).
+If you prefer to run your own instance, this repository also support TeslaMate API and Tesla Fleet API (Requires Tesla Developer Account and proper Fleet API registration).
 
 ## Features
 
