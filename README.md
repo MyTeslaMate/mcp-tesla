@@ -2,11 +2,65 @@
 
 This repository provides a [Model Context Protocol](https://github.com/modelcontextprotocol/spec) server that wraps both the Tesla Fleet API and the MyTeslaMate API. It includes vehicle endpoints, vehicle commands, energy endpoints (Powerwall/Solar), and charging endpoints. The implementation is modular and fully featured, exposing **98 MCP tools** for the Tesla Fleet API and **9 MCP tools** for the TeslaMate API.
 
-## 🚀 Quick Start - Use Directly in VS Code, Claude, etc.
+---
 
-**No installation required!** Use the hosted MCP server directly for either Tesla Fleet API or MyTeslaMate API:
+## 🔐 One-Click SSO — Connect with Your Tesla Account
 
-### For VS Code / Cursor (with MCP Extension) and Other MCP Clients
+The hosted server supports **OAuth 2.0 Single Sign-On** via Tesla's official authorization server. Compatible clients (ChatGPT, Claude.ai, VS Code…) trigger an automatic sign-in flow — **no token copy-paste required**.
+
+```
+MCP server URL: https://mcp.myteslamate.com/mcp
+```
+
+> The server proxies the OAuth flow to `auth.tesla.com`, then exchanges your Tesla token for a MyTeslaMate token transparently. Your Tesla credentials never touch this server.
+
+---
+
+### 🤖 Setup on ChatGPT (Apps / MCP Connector)
+
+ChatGPT supports native MCP connectors via **Settings → Apps**.
+
+1. In [chat.openai.com](https://chat.openai.com), open **Settings** → **Apps**.
+2. Click **Create app**.
+3. Enter the MCP server URL:
+   ```
+   https://mcp.myteslamate.com/mcp
+   ```
+4. ChatGPT will auto-discover the OAuth metadata and prompt you to **Connect**.
+5. Sign in with your Tesla account — the authorization is handled automatically.
+6. The connector appears in your **Enabled apps** list and is available in all your chats.
+
+---
+
+### 🧠 Setup on Claude.ai (MCP Connector)
+
+1. Open [claude.ai](https://claude.ai) → **Settings** → **Connectors**.
+2. Click **Add custom connector**.
+3. Enter a name (e.g. `Tesla`) and the MCP server URL:
+   ```
+   https://mcp.myteslamate.com/mcp
+   ```
+4. Click **Add** — Claude will auto-discover the OAuth metadata and show a **Connect** button.
+5. Click **Connect** — you'll be redirected to Tesla's login page.
+6. After authorization, Claude will have access to all Tesla MCP tools.
+
+> **Note:** OAuth-based SSO requires a MyTeslaMate account. The server validates your Tesla token and links it to your MTM subscription automatically.
+
+---
+
+## 🚀 Quick Start - Use Directly in VS Code, Claude Desktop, etc.
+
+**No installation required!** Use the hosted MCP server directly. Two authentication options:
+
+### Option A — SSO (Recommended for Claude.ai & ChatGPT)
+
+Simply provide the server URL and let the client handle the OAuth flow automatically (see sections above).
+
+### Option B — Manual Token (VS Code, Cursor, Claude Desktop)
+
+For clients that don't support OAuth, use your MyTeslaMate API token directly in the `Authorization` header.
+
+#### For VS Code / Cursor (with MCP Extension) and Other MCP Clients
 
 Add both endpoints to your `.vscode/mcp.json` configuration to choose your preferred integration:
 
@@ -35,7 +89,7 @@ Add both endpoints to your `.vscode/mcp.json` configuration to choose your prefe
 - Use `tesla_fleet_api` for direct access to Tesla's official Fleet API.
 - Use `teslamate` for integration via MyTeslaMate API.
 
-### For Claude Desktop
+#### For Claude Desktop
 
 Add both endpoints to your `claude_desktop_config.json`:
 
@@ -64,12 +118,12 @@ Add both endpoints to your `claude_desktop_config.json`:
 Select the server according to your authentication method and API preference.
 
 
-### 🔑 Getting Your Token
+### 🔑 Getting Your Token (Manual Mode Only)
 1. Visit [MyTeslaMate.com](https://myteslamate.com)
-2. Sign in with your Tesla account  
+2. Sign in with your Tesla account
 3. Navigate to the API section in your dashboard
 4. Copy your personal API token
-5. Use it in your MCP configuration (some clients handle authentication automatically)
+5. Use it in your MCP configuration
 
 ## ✨ What You Can Do
 
