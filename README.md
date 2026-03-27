@@ -6,25 +6,49 @@ This repository provides a [Model Context Protocol](https://github.com/modelcont
 
 ## ✨ What You Can Do
 
-Once configured, you can control your Tesla directly from your favorite MCP-enabled application:
+This isn't just remote control — it's a conversational interface to your entire Tesla ecosystem. **Express your use cases directly to your AI** — describe what you want in plain language and let it figure out which tools to call, in what order, and with what parameters. No app to open, no menu to navigate.
 
-- **🚗 Vehicle Control**: Lock/unlock, start climate, open trunk, flash lights *(Tesla Fleet API only)*
-- **🔋 Charging**: Start/stop charging, set charge limits, schedule charging *(Tesla Fleet API only)*
-- **📍 Location**: Get vehicle location, send navigation destinations *(Tesla Fleet API only)*
-- **🌡️ Climate**: Set temperature, seat heaters, steering wheel heater *(Tesla Fleet API only)*
-- **🛡️ Security**: Sentry mode, valet mode, speed limits *(Tesla Fleet API only)*
-- **⚡ Energy**: Monitor Powerwall/Solar (if you have Tesla Energy products) *(Tesla Fleet API only)*
-- **📊 Data**: Get vehicle data, charging history, energy usage
+### ⚡ Energy Optimization
 
-**With the TeslaMate API**, you can:
-- View live and historical vehicle data (location, state, battery, climate, charging)
-- Access charging history and energy usage
-- Monitor trips and drive statistics
-- Get notifications and alerts
-- Integrate with your self-hosted TeslaMate instance for privacy and advanced analytics
+> *"My Powerwall is at 40%. Should I charge my car now or wait for solar production this afternoon?"*
 
-Just ask in natural language: *"Lock my Tesla"*, *"Set the charge limit to 80%"*, *"Turn on the seat heater"*, etc.  
-*(Note: Control commands and some endpoints are only available via the Tesla Fleet API. TeslaMate API focuses on data, history, and analytics.)*
+> *"Analyze my last 30 days of energy data — am I losing money by exporting to the grid while paying to charge at night?"*
+
+> *"Set the Powerwall backup reserve to 20% and schedule the car to charge from 2am to 6am at 16A."*
+
+The AI can cross-reference your solar production, Powerwall state, grid rates, and vehicle battery level to give you a recommendation — and act on it immediately.
+
+### 🚗 Smart Vehicle Management
+
+> *"I have a road trip to Lyon next Thursday. Based on my usual efficiency, will I need to stop for charging? Find the best Supercharger on the route."*
+
+> *"Compare my energy consumption this month vs last month. What changed?"*
+
+> *"Pre-condition the car at 7:45am every weekday and set the charge limit back to 80% — it's currently at 100% from the trip."*
+
+### 📊 Data & Insights (with TeslaMate API)
+
+> *"What's my average km/kWh over the last 3 months? Is it getting worse?"*
+
+> *"Show me my most expensive charging sessions this year and where they happened."*
+
+> *"How many hours per week is the car sitting with climate running? What's the energy cost?"*
+
+### 🔐 Security & Peace of Mind
+
+> *"Is my car locked and is Sentry mode on? I forgot to check before my flight."*
+
+> *"My car is parked downtown. Turn on Sentry mode and send me the current location."*
+
+---
+
+**Available capabilities** (98 tools for Tesla Fleet API + 9 for TeslaMate API):
+- **Vehicle control**: lock/unlock, climate, trunk, windows, lights, horn
+- **Charging**: start/stop, set limits, schedule, charging amps, charge history
+- **Powerwall & Solar**: live status, energy history, backup reserve, storm mode, grid import/export, time-of-use settings
+- **Navigation**: send destinations, find nearby Superchargers
+- **Security**: Sentry mode, valet mode, speed limits, PIN to drive
+- **Data & analytics**: vehicle data, trip history, drive statistics *(TeslaMate API)*
 
 ## 🔐 One-Click SSO — Connect with Your Tesla Account
 
