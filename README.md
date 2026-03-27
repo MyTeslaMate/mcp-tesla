@@ -94,6 +94,21 @@ ChatGPT supports native MCP connectors via **Settings → Apps**.
 
 ---
 
+## 🤖 Claude Code Skills
+
+Ready-to-use Claude Code skills for this MCP server are available in **[myteslamate/tesla-skills](https://github.com/MyTeslaMate/tesla-skills)**.
+
+Install the `/tesla` slash command in one step:
+
+Then in Claude Code:
+```
+/tesla what is my battery level?
+/tesla lock my car
+/tesla how much did I charge last month?
+```
+
+---
+
 ## 🚀 Quick Start - Use Directly in VS Code, Claude Desktop, etc.
 
 **No installation required!** Use the hosted MCP server directly. Two authentication options:
@@ -113,20 +128,9 @@ Add both endpoints to your `.vscode/mcp.json` configuration to choose your prefe
 ```json
 {
   "servers": {
-    "tesla_fleet_api": {
+    "tesla": {
       "type": "http",
-      "url": "https://mcp.myteslamate.com/mcp?tags=tesla_fleet_api",
-      "headers": {
-        "Authorization": "Bearer YOUR_MYTESLAMATE_TOKEN"
-      }
-    },
-    "teslamate": {
-      "type": "http",
-      "url": "https://mcp.myteslamate.com/mcp?tags=teslamate",
-      "headers": {
-        "X-Teslamate-EndPoint": "https://YOUR_MYTESLAMATE_API_ENDPOINT",
-        "X-Teslamate-Authorization": "Bearer YOUR_MYTESLAMATE_TOKEN"
-      }
+      "url": "https://mcp.myteslamate.com/mcp"
     }
   }
 }
@@ -137,28 +141,10 @@ Add both endpoints to your `.vscode/mcp.json` configuration to choose your prefe
 
 #### For Claude Desktop
 
-Add both endpoints to your `claude_desktop_config.json`:
+Add endpoints in the MCP Connector configuration with the same URLs and headers as above.:
 
-```json
-{
-  "mcpServers": {
-    "tesla_fleet_api": {
-      "type": "http",
-      "url": "https://mcp.myteslamate.com/mcp?tags=tesla_fleet_api",
-      "headers": {
-        "Authorization": "Bearer YOUR_MYTESLAMATE_TOKEN"
-      }
-    },
-    "teslamate": {
-      "type": "http",
-      "url": "https://mcp.myteslamate.com/mcp?tags=teslamate",
-      "headers": {
-        "X-Teslamate-EndPoint": "https://YOUR_MYTESLAMATE_API_ENDPOINT",
-        "X-Teslamate-Authorization": "Bearer YOUR_MYTESLAMATE_TOKEN"
-      }
-    }
-  }
-}
+```bash
+claude mcp add --transport http tesla-api "https://mcp.myteslamate.com/mcp"
 ```
 
 Select the server according to your authentication method and API preference.
