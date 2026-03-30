@@ -64,10 +64,25 @@ def _extract_teslamate_bearer_token(ctx: Context) -> str:
     return _extract_bearer_token(ctx)
 
 def _extract_teslamate_endpoint(ctx: Context) -> str:
-    """Extract Teslamate endpoint from MCP request headers."""
+    """Extract Teslamate API endpoint.
+
+    In OAuth mode, the endpoint is stored in AccessToken.claims as
+    ``teslamate_api_endpoint`` (set from the /api/auth/exchange response).
+    Falls back to the ``x-teslamate-endpoint`` request header for manual mode.
+    """
     request = ctx.request_context.request
+
+    # OAuth mode: endpoint stored in token claims
+    user = getattr(request, "user", None) if hasattr(request, "user") else None
+    if user and hasattr(user, "access_token"):
+        endpoint = user.access_token.claims.get("teslamate_api_endpoint", "")
+        if endpoint:
+            return endpoint
+
+    # Manual mode: endpoint passed via header
     if hasattr(request, "headers"):
         return request.headers.get("x-teslamate-endpoint", "")
+
     raise RuntimeError("No Teslamate endpoint found in MCP request")
 
 def _execute(handler, **kwargs):
