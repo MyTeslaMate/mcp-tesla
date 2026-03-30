@@ -44,7 +44,7 @@ TESLA_SCOPES = [
     "energy_cmds",
 ]
 
-# In-memory mapping: tesla_token → {mtm_token, subscribe_api, subscribe_teslamate}
+# In-memory mapping: tesla_token → {mtm_token, subscribe_api, subscribe_teslamate, teslamate_api_endpoint}
 # Populated by TeslaTokenVerifier on each token verification.
 # Cleared on server restart (acceptable for MVP).
 _token_map: dict[str, dict] = {}
@@ -85,6 +85,7 @@ class TeslaTokenVerifier(TokenVerifier):
                     "mtm_token": cached["mtm_token"],
                     "subscribe_api": cached["subscribe_api"],
                     "subscribe_teslamate": cached["subscribe_teslamate"],
+                    "teslamate_api_endpoint": cached["teslamate_api_endpoint"],
                 },
             )
 
@@ -105,10 +106,12 @@ class TeslaTokenVerifier(TokenVerifier):
 
         subscribe_api = bool(data.get("subscribe_api", False))
         subscribe_teslamate = bool(data.get("subscribe_teslamate", False))
+        teslamate_api_endpoint = data.get("teslamate_api_endpoint", "")
         _token_map[token] = {
             "mtm_token": mtm_token,
             "subscribe_api": subscribe_api,
             "subscribe_teslamate": subscribe_teslamate,
+            "teslamate_api_endpoint": teslamate_api_endpoint,
         }
         return AccessToken(
             token=token,
@@ -119,6 +122,7 @@ class TeslaTokenVerifier(TokenVerifier):
                 "mtm_token": mtm_token,
                 "subscribe_api": subscribe_api,
                 "subscribe_teslamate": subscribe_teslamate,
+                "teslamate_api_endpoint": teslamate_api_endpoint,
             },
         )
 
