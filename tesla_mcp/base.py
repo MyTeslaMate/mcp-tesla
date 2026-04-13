@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import logging
 import os
 from dataclasses import dataclass
@@ -29,6 +30,9 @@ class TeslaRequestContext:
 
     bearer_token: str
     base_url: str
+    auth_type: str = "bearer"
+    basic_auth_username: Optional[str] = None
+    basic_auth_password: Optional[str] = None
 
     @classmethod
     def from_env(cls, bearer_token: str) -> "TeslaRequestContext":
@@ -60,8 +64,15 @@ class TeslaClient:
         return session
 
     def _build_headers(self, context: TeslaRequestContext, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+        if context.auth_type.lower() == "basic":
+            if not (context.basic_auth_username and context.basic_auth_password):
+                raise TeslaAPIError("Basic auth requested but credentials are missing")
+            raw = f"{context.basic_auth_username}:{context.basic_auth_password}".encode()
+            auth_value = f"Basic {base64.b64encode(raw).decode()}"
+        else:
+            auth_value = f"Bearer {context.bearer_token}"
         headers = {
-            "Authorization": f"Bearer {context.bearer_token}",
+            "Authorization": auth_value,
             "Content-Type": "application/json",
             "Accept": "application/json",
             "User-Agent": "Tesla-MCP/1.0",

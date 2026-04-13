@@ -63,6 +63,22 @@ def _extract_teslamate_bearer_token(ctx: Context) -> str:
     """Extract MyTeslaMate bearer token — delegates to _extract_bearer_token."""
     return _extract_bearer_token(ctx)
 
+def _extract_teslamate_auth_type(ctx: Context) -> str:
+    """Return 'basic' or 'bearer' to decide the Authorization scheme for TeslaMate calls.
+
+    OAuth mode: sourced from AccessToken.claims (set by /api/auth/exchange response).
+    Manual mode: falls back to ``x-teslamate-auth-type`` header. Defaults to 'bearer'.
+    """
+    request = ctx.request_context.request
+    user = getattr(request, "user", None) if hasattr(request, "user") else None
+    if user and hasattr(user, "access_token"):
+        auth_type = user.access_token.claims.get("teslamate_auth_type", "")
+        if auth_type:
+            return auth_type.lower()
+    if hasattr(request, "headers"):
+        return (request.headers.get("x-teslamate-auth-type") or "bearer").lower()
+    return "bearer"
+
 def _extract_teslamate_endpoint(ctx: Context) -> str:
     """Extract Teslamate API endpoint.
 
@@ -1391,6 +1407,7 @@ def teslamate_get_cars(ctx: Context):
         teslamate_module.get_cars,
         bearer_token=bearer_token,
         endpoint=_extract_teslamate_endpoint(ctx),
+        auth_type=_extract_teslamate_auth_type(ctx),
     )
 
 
@@ -1408,6 +1425,7 @@ def teslamate_get_car(car_id: int, ctx: Context):
         car_id=car_id,
         bearer_token=bearer_token,
         endpoint=_extract_teslamate_endpoint(ctx),
+        auth_type=_extract_teslamate_auth_type(ctx),
     )
 
 
@@ -1427,6 +1445,7 @@ def teslamate_get_car_battery_health(car_id: int, ctx: Context):
         car_id=car_id,
         bearer_token=bearer_token,
         endpoint=_extract_teslamate_endpoint(ctx),
+        auth_type=_extract_teslamate_auth_type(ctx),
     )
 
 
@@ -1453,6 +1472,7 @@ def teslamate_get_car_charges(
         end_date=end_date,
         bearer_token=bearer_token,
         endpoint=_extract_teslamate_endpoint(ctx),
+        auth_type=_extract_teslamate_auth_type(ctx),
     )
 
 
@@ -1472,6 +1492,7 @@ def teslamate_get_car_charge(car_id: int, charge_id: int, ctx: Context):
         charge_id=charge_id,
         bearer_token=bearer_token,
         endpoint=_extract_teslamate_endpoint(ctx),
+        auth_type=_extract_teslamate_auth_type(ctx),
     )
 
 
@@ -1498,6 +1519,7 @@ def teslamate_get_car_drives(
         end_date=end_date,
         bearer_token=bearer_token,
         endpoint=_extract_teslamate_endpoint(ctx),
+        auth_type=_extract_teslamate_auth_type(ctx),
     )
 
 
@@ -1517,6 +1539,7 @@ def teslamate_get_car_drive(car_id: int, drive_id: int, ctx: Context):
         drive_id=drive_id,
         bearer_token=bearer_token,
         endpoint=_extract_teslamate_endpoint(ctx),
+        auth_type=_extract_teslamate_auth_type(ctx),
     )
 
 
@@ -1536,6 +1559,7 @@ def teslamate_get_car_status(car_id: int, ctx: Context):
         car_id=car_id,
         bearer_token=bearer_token,
         endpoint=_extract_teslamate_endpoint(ctx),
+        auth_type=_extract_teslamate_auth_type(ctx),
     )
 
 
@@ -1555,6 +1579,7 @@ def teslamate_get_car_updates(car_id: int, ctx: Context):
         car_id=car_id,
         bearer_token=bearer_token,
         endpoint=_extract_teslamate_endpoint(ctx),
+        auth_type=_extract_teslamate_auth_type(ctx),
     )
 
 

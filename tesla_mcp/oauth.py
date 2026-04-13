@@ -86,6 +86,7 @@ class TeslaTokenVerifier(TokenVerifier):
                     "subscribe_api": cached["subscribe_api"],
                     "subscribe_teslamate": cached["subscribe_teslamate"],
                     "teslamate_api_endpoint": cached["teslamate_api_endpoint"],
+                    "teslamate_auth_type": cached["teslamate_auth_type"],
                 },
             )
 
@@ -107,11 +108,13 @@ class TeslaTokenVerifier(TokenVerifier):
         subscribe_api = bool(data.get("subscribe_api", False))
         subscribe_teslamate = bool(data.get("subscribe_teslamate", False))
         teslamate_api_endpoint = data.get("teslamate_api_endpoint", "")
+        teslamate_auth_type = (data.get("auth_type") or "bearer").lower()
         _token_map[token] = {
             "mtm_token": mtm_token,
             "subscribe_api": subscribe_api,
             "subscribe_teslamate": subscribe_teslamate,
             "teslamate_api_endpoint": teslamate_api_endpoint,
+            "teslamate_auth_type": teslamate_auth_type,
         }
         return AccessToken(
             token=token,
@@ -123,6 +126,7 @@ class TeslaTokenVerifier(TokenVerifier):
                 "subscribe_api": subscribe_api,
                 "subscribe_teslamate": subscribe_teslamate,
                 "teslamate_api_endpoint": teslamate_api_endpoint,
+                "teslamate_auth_type": teslamate_auth_type,
             },
         )
 
