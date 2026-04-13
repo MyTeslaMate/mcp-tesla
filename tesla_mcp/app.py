@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+from pathlib import Path
 from typing import List, Optional
 from urllib.parse import urlparse
 
@@ -208,9 +209,16 @@ def _sanitize_response_payload(payload):
     return payload
 
 
-def tesla_tool(*, tags: set[str], read_only: bool, destructive: bool, open_world: bool = True):
+def tesla_tool(
+    *,
+    tags: set[str],
+    read_only: bool,
+    destructive: bool,
+    open_world: bool = True,
+    output_template: str | None = None,
+):
     """Register MCP tool with mandatory OpenAI-compatible safety hints."""
-    return mcp.tool(
+    kwargs = dict(
         tags=tags,
         annotations={
             "readOnlyHint": read_only,
@@ -219,6 +227,22 @@ def tesla_tool(*, tags: set[str], read_only: bool, destructive: bool, open_world
         },
         app={"csp": APP_CSP},
     )
+    if output_template is not None:
+        kwargs["meta"] = {"openai/outputTemplate": output_template}
+    return mcp.tool(**kwargs)
+
+
+_WIDGETS_DIR = Path(__file__).parent / "widgets"
+
+
+@mcp.resource(
+    uri="ui://widget/vehicle-live.html",
+    name="Vehicle Live Widget",
+    mime_type="text/html+skybridge",
+)
+def vehicle_live_widget() -> str:
+    """HTML widget rendering a live vehicle state card for `get_vehicle_data`."""
+    return (_WIDGETS_DIR / "vehicle_live.html").read_text(encoding="utf-8")
 
 
 @tesla_tool(read_only=True, destructive=False, open_world=True, tags={"tesla_fleet_api"})
@@ -238,7 +262,13 @@ def get_vehicle(vehicle_tag: str, ctx: Context):
     )
 
 
-@tesla_tool(read_only=True, destructive=False, open_world=True, tags={"tesla_fleet_api"})
+@tesla_tool(
+    read_only=True,
+    destructive=False,
+    open_world=True,
+    tags={"tesla_fleet_api"},
+    output_template="ui://widget/vehicle-live.html",
+)
 def get_vehicle_data(vehicle_tag: str, ctx: Context):
     """Fetch live vehicle data (location, climate, charge, etc.)."""
     bearer_token = _extract_bearer_token(ctx)
