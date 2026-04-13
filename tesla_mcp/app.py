@@ -14,7 +14,7 @@ from .base import TeslaClient, TeslaAPIError
 from .modules import VehicleEndpoints, VehicleCommandsModule, EnergyModule, ChargingModule, UserModule, TeslaMateAPIModule
 from .oauth import TeslaProvider
 
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, PlainTextResponse
 
 import os
 
@@ -88,6 +88,10 @@ SENSITIVE_VALUE_PATTERNS = [
 ]
 
 mcp_port = int(os.environ.get("PORT", 8084))
+openai_apps_challenge_token = os.environ.get(
+    "OPENAI_APPS_CHALLENGE_TOKEN",
+    "mjfI5TvAUa5hL6MtblBT5Q_6Vg1Y8qEltcPyIor5Cz4",
+)
 _tesla_oauth_client_id = os.environ.get("TESLA_OAUTH_CLIENT_ID")
 mcp = FastMCP(
     "Tesla Vehicle MCP",
@@ -1694,6 +1698,11 @@ def teslamate_get_car_updates(car_id: int, ctx: Context):
 @mcp.custom_route("/health", methods=["GET"])
 async def health_check(request):
     return JSONResponse({"status": "healthy", "service": "mcp-server"})
+
+
+@mcp.custom_route("/.well-known/openai-apps-challenge", methods=["GET"])
+async def openai_apps_challenge(request):
+    return PlainTextResponse(openai_apps_challenge_token)
 
 
 # a middleware to filter tools based on subscription flags and "tags" query parameter
