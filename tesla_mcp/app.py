@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from typing import List, Optional
+from urllib.parse import urlparse
 
 from fastmcp import Context, FastMCP
 from fastmcp.server.middleware import Middleware, MiddlewareContext
@@ -19,6 +20,42 @@ import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("tesla_mcp")
+
+
+def _normalize_origin(url: str | None) -> str | None:
+    """Return normalized https origin from a URL-like value."""
+    if not url:
+        return None
+
+    parsed = urlparse(url)
+    if not parsed.scheme or not parsed.netloc:
+        return None
+
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _build_csp_connect_domains() -> list[str]:
+    """Build strict, deduplicated connect domains for FastMCP app CSP."""
+    configured_base_url = _normalize_origin(os.environ.get("TESLA_OAUTH_BASE_URL"))
+    configured_mtm_url = _normalize_origin(os.environ.get("TESLA_OAUTH_MTM_BASE_URL"))
+
+    connect_domains = [
+        configured_base_url or "https://mcp.myteslamate.com",
+        "https://fleet-auth.prd.vn.cloud.tesla.com",
+    ]
+    if configured_mtm_url:
+        connect_domains.append(configured_mtm_url)
+
+    # Preserve order while deduplicating
+    return list(dict.fromkeys(connect_domains))
+
+
+APP_CSP = {
+    "connect_domains": _build_csp_connect_domains(),
+    "resource_domains": [],
+    "frame_domains": [],
+    "base_uri_domains": [],
+}
 
 mcp_port = int(os.environ.get("PORT", 8084))
 _tesla_oauth_client_id = os.environ.get("TESLA_OAUTH_CLIENT_ID")
@@ -119,6 +156,7 @@ def tesla_tool(*, tags: set[str], read_only: bool, destructive: bool, open_world
             "destructiveHint": destructive,
             "openWorldHint": open_world,
         },
+        app={"csp": APP_CSP},
     )
 
 
