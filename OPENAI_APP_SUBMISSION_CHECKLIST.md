@@ -44,9 +44,9 @@ Le serveur expose de nombreux outils via `@mcp.tool(tags={...})` mais sans hints
 
 ## 5) Confidentialité / minimisation des données
 
-- [ ] Auditer les réponses de chaque outil (incluant champs imbriqués et payloads debug).
-- [ ] Supprimer tout identifiant interne/télémétrie inutile (session IDs, trace IDs, timestamps non nécessaires, etc.).
-- [ ] Supprimer tout secret d’authentification renvoyé accidentellement.
+- [x] Auditer les réponses de chaque outil (incluant champs imbriqués et payloads debug) — audit centralisé via sanitization dans `tesla_mcp/app.py`.
+- [x] Supprimer tout identifiant interne/télémétrie inutile (session IDs, trace IDs, timestamps non nécessaires, etc.) — suppression des champs internes connus (`session_id`, `trace_id`, etc.) dans la sortie des tools.
+- [x] Supprimer tout secret d’authentification renvoyé accidentellement — suppression des clés sensibles (`access_token`, `refresh_token`, `authorization`, etc.) + masquage de patterns token.
 - [x] Vérifier que la privacy policy documente exactement les catégories de données retournées/traitées (plan de vérification documenté).
 
 ### Observation repo MyTeslaMate
@@ -82,4 +82,3 @@ Le code manipule des tokens OAuth/Tesla/MyTeslaMate et injecte des informations 
 2. **Bloquant** : vérifier présence d’une CSP conforme et documentée.
 3. **Bloquant** : finaliser privacy policy alignée avec les données réellement retournées.
 4. **Fortement recommandé** : préparer 10 à 20 cas de test de review reproductibles.
-

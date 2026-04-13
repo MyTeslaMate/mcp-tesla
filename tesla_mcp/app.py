@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import List, Optional
 from urllib.parse import urlparse
 
@@ -56,6 +57,35 @@ APP_CSP = {
     "frame_domains": [],
     "base_uri_domains": [],
 }
+
+SENSITIVE_KEY_NAMES = {
+    "access_token",
+    "refresh_token",
+    "id_token",
+    "token",
+    "tesla_token",
+    "mtm_token",
+    "authorization",
+    "client_secret",
+    "api_key",
+    "password",
+    "secret",
+    "set-cookie",
+    "cookie",
+}
+INTERNAL_TELEMETRY_KEYS = {
+    "session_id",
+    "trace_id",
+    "request_id",
+    "correlation_id",
+    "internal_id",
+    "debug",
+    "stack_trace",
+}
+SENSITIVE_VALUE_PATTERNS = [
+    re.compile(r"^Bearer\s+[A-Za-z0-9._\-+/=]+$", re.IGNORECASE),
+    re.compile(r"^[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}$"),
+]
 
 mcp_port = int(os.environ.get("PORT", 8084))
 _tesla_oauth_client_id = os.environ.get("TESLA_OAUTH_CLIENT_ID")
@@ -140,11 +170,38 @@ def _extract_teslamate_endpoint(ctx: Context) -> str:
 
 def _execute(handler, **kwargs):
     try:
-        return handler(**kwargs)
+        result = handler(**kwargs)
+        return _sanitize_response_payload(result)
     except TeslaAPIError as exc:  # pragma: no cover - tool surface
         logger.error("Tesla API error: %s", exc)
         status = f" (status {exc.status_code})" if exc.status_code else ""
         raise RuntimeError(f"Tesla API error{status}: {exc}") from exc
+
+
+def _looks_like_secret_string(value: str) -> bool:
+    return any(pattern.match(value.strip()) for pattern in SENSITIVE_VALUE_PATTERNS)
+
+
+def _sanitize_response_payload(payload):
+    """Remove sensitive/auth/debug fields before returning tool output."""
+    if isinstance(payload, dict):
+        cleaned = {}
+        for key, value in payload.items():
+            normalized_key = str(key).strip().lower()
+            if normalized_key in SENSITIVE_KEY_NAMES:
+                continue
+            if normalized_key in INTERNAL_TELEMETRY_KEYS:
+                continue
+            cleaned[key] = _sanitize_response_payload(value)
+        return cleaned
+
+    if isinstance(payload, list):
+        return [_sanitize_response_payload(item) for item in payload]
+
+    if isinstance(payload, str) and _looks_like_secret_string(payload):
+        return "***redacted***"
+
+    return payload
 
 
 def tesla_tool(*, tags: set[str], read_only: bool, destructive: bool, open_world: bool = True):
