@@ -98,7 +98,7 @@ _tesla_oauth_client_id = os.environ.get("TESLA_OAUTH_CLIENT_ID")
 mcp = FastMCP(
     "MyTeslaMate MCP",
     auth=TeslaProvider() if _tesla_oauth_client_id else None,
-    icons=[Icon(src="https://myteslamate.com/favicon.ico", mimeType="image/x-icon")],
+    icons=[Icon(src="https://www.myteslamate.com/wp-content/uploads/2026/04/splash-icon.png", mimeType="image/png")],
     website_url="https://app.myteslamate.com",
 )
 client = TeslaClient()
