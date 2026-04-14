@@ -234,11 +234,25 @@ def tesla_tool(
 
 _WIDGETS_DIR = Path(__file__).parent / "widgets"
 
+VEHICLE_LIVE_WIDGET_META = {
+    "ui": {
+        "domain": "https://mcp.myteslamate.com",
+        "csp": {
+            "connectDomains": [
+                "https://mcp.myteslamate.com",
+                "https://fleet-auth.prd.vn.cloud.tesla.com",
+            ],
+            "resourceDomains": [],
+        },
+    },
+}
+
 
 @mcp.resource(
     uri="ui://widget/vehicle-live.html",
     name="Vehicle Live Widget",
     mime_type="text/html+skybridge",
+    meta=VEHICLE_LIVE_WIDGET_META,
 )
 def vehicle_live_widget() -> str:
     """HTML widget rendering a live vehicle state card for `get_vehicle_data`."""
