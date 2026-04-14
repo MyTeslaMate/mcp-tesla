@@ -245,6 +245,7 @@ VEHICLE_LIVE_WIDGET_META = {
             "resourceDomains": [],
         },
     },
+    "openai/widgetDescription": "Shows a vehicle live data card rendered by get_vehicle_data."
 }
 
 
