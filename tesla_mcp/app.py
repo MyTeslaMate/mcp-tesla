@@ -249,6 +249,21 @@ VEHICLE_LIVE_WIDGET_META = {
 }
 
 
+PRODUCTS_LIST_WIDGET_META = {
+    "ui": {
+        "domain": "https://mcp.myteslamate.com",
+        "csp": {
+            "connectDomains": [
+                "https://mcp.myteslamate.com",
+                "https://fleet-auth.prd.vn.cloud.tesla.com",
+            ],
+            "resourceDomains": [],
+        },
+    },
+    "openai/widgetDescription": "Lists Tesla vehicles and energy sites available to the authenticated account."
+}
+
+
 @mcp.resource(
     uri="ui://widget/vehicle-live.html",
     name="Vehicle Live Widget",
@@ -260,7 +275,24 @@ def vehicle_live_widget() -> str:
     return (_WIDGETS_DIR / "vehicle_live.html").read_text(encoding="utf-8")
 
 
-@tesla_tool(read_only=True, destructive=False, open_world=True, tags={"tesla_fleet_api"})
+@mcp.resource(
+    uri="ui://widget/products-list.html",
+    name="Tesla Products Widget",
+    mime_type="text/html+skybridge",
+    meta=PRODUCTS_LIST_WIDGET_META,
+)
+def products_list_widget() -> str:
+    """HTML widget rendering the list of vehicles and energy sites for `list_vehicles_and_energy_sites`."""
+    return (_WIDGETS_DIR / "products_list.html").read_text(encoding="utf-8")
+
+
+@tesla_tool(
+    read_only=True,
+    destructive=False,
+    open_world=True,
+    tags={"tesla_fleet_api"},
+    output_template="ui://widget/products-list.html",
+)
 def list_vehicles_and_energy_sites(ctx: Context):
     """Return the vehicles and energy sites available to the authenticated account."""
     bearer_token = _extract_bearer_token(ctx)
