@@ -153,9 +153,10 @@
 
   const root = document.getElementById("root");
 
-  function openai() { return (typeof window !== "undefined" && window.openai) || null; }
-  function getToolOutput() { const a = openai(); return (a && a.toolOutput) || null; }
-  function getToolInput() { const a = openai(); return (a && a.toolInput) || {}; }
+  // Support both Anthropic/Claude (window.claude) and OpenAI/ChatGPT (window.openai) widget runtimes.
+  function clientApi() { return (typeof window !== "undefined" && (window.claude || window.openai)) || null; }
+  function getToolOutput() { const a = clientApi(); return (a && a.toolOutput) || null; }
+  function getToolInput() { const a = clientApi(); return (a && a.toolInput) || {}; }
 
   function unwrap(payload) {
     if (!payload) return null;
@@ -226,7 +227,7 @@
   }
 
   function render() {
-    const api = openai();
+    const api = clientApi();
     const raw = getToolOutput();
     const data = unwrap(raw);
 
@@ -424,7 +425,7 @@
 
   render();
 
-  const api = openai();
+  const api = clientApi();
   if (api && typeof api.addEventListener === "function") {
     api.addEventListener("toolOutputChanged", render);
     api.addEventListener("widgetStateChanged", render);
