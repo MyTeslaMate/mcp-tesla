@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 from fastmcp import Context, FastMCP
 from fastmcp.server.middleware import Middleware, MiddlewareContext
+from mcp.types import Icon
 
 
 from .base import TeslaClient, TeslaAPIError
@@ -95,8 +96,10 @@ openai_apps_challenge_token = os.environ.get(
 )
 _tesla_oauth_client_id = os.environ.get("TESLA_OAUTH_CLIENT_ID")
 mcp = FastMCP(
-    "Tesla Vehicle MCP",
+    "MyTeslaMate MCP",
     auth=TeslaProvider() if _tesla_oauth_client_id else None,
+    icons=[Icon(src="https://myteslamate.com/favicon.ico", mimeType="image/x-icon")],
+    website_url="https://app.myteslamate.com",
 )
 client = TeslaClient()
 vehicle_module = VehicleEndpoints(client)

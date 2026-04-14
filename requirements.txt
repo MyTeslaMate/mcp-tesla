@@ -1,4 +1,4 @@
 #mcp>=0.1.0
 requests>=2.31.0
 uvicorn[standard]
-fastmcp>=v2.12.4
+fastmcp>=2.13
