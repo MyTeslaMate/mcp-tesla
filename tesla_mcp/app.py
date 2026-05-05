@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import re
 from pathlib import Path
 from typing import List, Optional
 from urllib.parse import urlparse
@@ -11,7 +10,12 @@ from fastmcp.server.middleware import Middleware, MiddlewareContext
 from mcp.types import Icon
 
 
-from .base import TeslaClient, TeslaAPIError
+from .auth_context import (
+    execute as _execute,
+    extract_bearer_token as _extract_bearer_token,
+    sanitize_response_payload as _sanitize_response_payload,
+)
+from .base import TeslaClient
 
 from .modules import VehicleEndpoints, VehicleCommandsModule, EnergyModule, ChargingModule, UserModule, TeslaMateAPIModule
 from .oauth import TeslaProvider
@@ -60,35 +64,6 @@ APP_CSP = {
     "base_uri_domains": [],
 }
 
-SENSITIVE_KEY_NAMES = {
-    "access_token",
-    "refresh_token",
-    "id_token",
-    "token",
-    "tesla_token",
-    "mtm_token",
-    "authorization",
-    "client_secret",
-    "api_key",
-    "password",
-    "secret",
-    "set-cookie",
-    "cookie",
-}
-INTERNAL_TELEMETRY_KEYS = {
-    "session_id",
-    "trace_id",
-    "request_id",
-    "correlation_id",
-    "internal_id",
-    "debug",
-    "stack_trace",
-}
-SENSITIVE_VALUE_PATTERNS = [
-    re.compile(r"^Bearer\s+[A-Za-z0-9._\-+/=]+$", re.IGNORECASE),
-    re.compile(r"^[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}$"),
-]
-
 mcp_port = int(os.environ.get("PORT", 8084))
 openai_apps_challenge_token = os.environ.get(
     "OPENAI_APPS_CHALLENGE_TOKEN",
@@ -108,108 +83,6 @@ energy_module = EnergyModule(client)
 charging_module = ChargingModule(client)
 user_module = UserModule(client)
 teslamate_module = TeslaMateAPIModule(client)
-
-
-def _extract_bearer_token(ctx: Context) -> str:
-    """Extract bearer token from MCP request headers.
-
-    In OAuth mode, fastmcp 3.x issues its own JWTs — the MTM token is stored
-    in AccessToken.claims by TeslaTokenVerifier. Return it when available.
-    In manual mode, the Authorization header carries the MTM token directly.
-    """
-    request = ctx.request_context.request
-
-    # OAuth mode: get token from AccessToken claims
-    user = getattr(request, "user", None) if hasattr(request, "user") else None
-    if user and hasattr(user, "access_token"):
-        mtm_token = user.access_token.claims.get("mtm_token")
-        if mtm_token:
-            return mtm_token
-
-    # Manual mode: token is in the Authorization header
-    if hasattr(request, "headers"):
-        auth_header = request.headers.get("authorization", "")
-        if auth_header.startswith("Bearer "):
-            return auth_header[7:]
-
-    raise RuntimeError("No Authorization header found in MCP request")
-
-def _extract_teslamate_bearer_token(ctx: Context) -> str:
-    """Extract MyTeslaMate bearer token — delegates to _extract_bearer_token."""
-    return _extract_bearer_token(ctx)
-
-def _extract_teslamate_auth_type(ctx: Context) -> str:
-    """Return 'basic' or 'bearer' to decide the Authorization scheme for TeslaMate calls.
-
-    OAuth mode: sourced from AccessToken.claims (set by /api/auth/exchange response).
-    Manual mode: falls back to ``x-teslamate-auth-type`` header. Defaults to 'bearer'.
-    """
-    request = ctx.request_context.request
-    user = getattr(request, "user", None) if hasattr(request, "user") else None
-    if user and hasattr(user, "access_token"):
-        auth_type = user.access_token.claims.get("teslamate_auth_type", "")
-        if auth_type:
-            return auth_type.lower()
-    if hasattr(request, "headers"):
-        return (request.headers.get("x-teslamate-auth-type") or "bearer").lower()
-    return "bearer"
-
-def _extract_teslamate_endpoint(ctx: Context) -> str:
-    """Extract Teslamate API endpoint.
-
-    In OAuth mode, the endpoint is stored in AccessToken.claims as
-    ``teslamate_api_endpoint`` (set from the /api/auth/exchange response).
-    Falls back to the ``x-teslamate-endpoint`` request header for manual mode.
-    """
-    request = ctx.request_context.request
-
-    # OAuth mode: endpoint stored in token claims
-    user = getattr(request, "user", None) if hasattr(request, "user") else None
-    if user and hasattr(user, "access_token"):
-        endpoint = user.access_token.claims.get("teslamate_api_endpoint", "")
-        if endpoint:
-            return endpoint
-
-    # Manual mode: endpoint passed via header
-    if hasattr(request, "headers"):
-        return request.headers.get("x-teslamate-endpoint", "")
-
-    raise RuntimeError("No Teslamate endpoint found in MCP request")
-
-def _execute(handler, **kwargs):
-    try:
-        result = handler(**kwargs)
-        return _sanitize_response_payload(result)
-    except TeslaAPIError as exc:  # pragma: no cover - tool surface
-        logger.error("Tesla API error: %s", exc)
-        status = f" (status {exc.status_code})" if exc.status_code else ""
-        raise RuntimeError(f"Tesla API error{status}: {exc}") from exc
-
-
-def _looks_like_secret_string(value: str) -> bool:
-    return any(pattern.match(value.strip()) for pattern in SENSITIVE_VALUE_PATTERNS)
-
-
-def _sanitize_response_payload(payload):
-    """Remove sensitive/auth/debug fields before returning tool output."""
-    if isinstance(payload, dict):
-        cleaned = {}
-        for key, value in payload.items():
-            normalized_key = str(key).strip().lower()
-            if normalized_key in SENSITIVE_KEY_NAMES:
-                continue
-            if normalized_key in INTERNAL_TELEMETRY_KEYS:
-                continue
-            cleaned[key] = _sanitize_response_payload(value)
-        return cleaned
-
-    if isinstance(payload, list):
-        return [_sanitize_response_payload(item) for item in payload]
-
-    if isinstance(payload, str) and _looks_like_secret_string(payload):
-        return "***redacted***"
-
-    return payload
 
 
 def tesla_tool(
@@ -1584,221 +1457,13 @@ def get_user_orders(ctx: Context):
     )
 
 
-# === TeslaMate API Endpoints ===
+# === TeslaMate sub-servers (mounted with namespace="teslamate") ===
 
+from .servers.teslamate_server import build_teslamate_server
+from .servers.teslamate_apps import build_teslamate_apps_server
 
-@tesla_tool(read_only=True, destructive=False, open_world=True, tags={"teslamate"})
-def teslamate_get_cars(ctx: Context):
-    """
-    Get all cars from TeslaMate database.
-    
-    Returns a list of cars with their basic<<< information including ID, name, model, etc.
-    """
-    bearer_token = _extract_teslamate_bearer_token(ctx)
-    return _execute(
-        teslamate_module.get_cars,
-        bearer_token=bearer_token,
-        endpoint=_extract_teslamate_endpoint(ctx),
-        auth_type=_extract_teslamate_auth_type(ctx),
-    )
-
-
-@tesla_tool(read_only=True, destructive=False, open_world=True, tags={"teslamate"})
-def teslamate_get_car(car_id: int, ctx: Context):
-    """
-    Get detailed information about a specific car from TeslaMate.
-    
-    Args:
-        car_id: The TeslaMate car ID
-    """
-    bearer_token = _extract_teslamate_bearer_token(ctx)
-    return _execute(
-        teslamate_module.get_car,
-        car_id=car_id,
-        bearer_token=bearer_token,
-        endpoint=_extract_teslamate_endpoint(ctx),
-        auth_type=_extract_teslamate_auth_type(ctx),
-    )
-
-
-@tesla_tool(read_only=True, destructive=False, open_world=True, tags={"teslamate"})
-def teslamate_get_car_battery_health(car_id: int, ctx: Context):
-    """
-    Get battery health information for a specific car from TeslaMate.
-    
-    Args:
-        car_id: The TeslaMate car ID
-        
-    Returns battery degradation data and health metrics.
-    """
-    bearer_token = _extract_teslamate_bearer_token(ctx)
-    return _execute(
-        teslamate_module.get_car_battery_health,
-        car_id=car_id,
-        bearer_token=bearer_token,
-        endpoint=_extract_teslamate_endpoint(ctx),
-        auth_type=_extract_teslamate_auth_type(ctx),
-    )
-
-
-@tesla_tool(read_only=True, destructive=False, open_world=True, tags={"teslamate"})
-def teslamate_get_car_charges(
-    car_id: int, 
-    ctx: Context,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None
-):
-    """
-    Get charging sessions for a specific car from TeslaMate.
-    
-    Args:
-        car_id: The TeslaMate car ID
-        start_date: Optional start date in RFC3339 format (e.g., 2006-01-02T15:04:05Z)
-        end_date: Optional end date in RFC3339 format (e.g., 2006-01-02T15:04:05Z)
-    """
-    bearer_token = _extract_teslamate_bearer_token(ctx)
-    return _execute(
-        teslamate_module.get_car_charges,
-        car_id=car_id,
-        start_date=start_date,
-        end_date=end_date,
-        bearer_token=bearer_token,
-        endpoint=_extract_teslamate_endpoint(ctx),
-        auth_type=_extract_teslamate_auth_type(ctx),
-    )
-
-
-@tesla_tool(read_only=True, destructive=False, open_world=True, tags={"teslamate"})
-def teslamate_get_car_charge(car_id: int, charge_id: int, ctx: Context):
-    """
-    Get detailed information about a specific charging session from TeslaMate.
-    
-    Args:
-        car_id: The TeslaMate car ID
-        charge_id: The charging session ID
-    """
-    bearer_token = _extract_teslamate_bearer_token(ctx)
-    return _execute(
-        teslamate_module.get_car_charge,
-        car_id=car_id,
-        charge_id=charge_id,
-        bearer_token=bearer_token,
-        endpoint=_extract_teslamate_endpoint(ctx),
-        auth_type=_extract_teslamate_auth_type(ctx),
-    )
-
-
-@tesla_tool(read_only=True, destructive=False, open_world=True, tags={"teslamate"})
-def teslamate_get_car_drives(
-    car_id: int,
-    ctx: Context,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    min_distance: Optional[float] = None,
-    max_distance: Optional[float] = None,
-):
-    """
-    Get driving sessions for a specific car from TeslaMate.
-
-    Args:
-        car_id: The TeslaMate car ID
-        start_date: Optional start date in RFC3339 format (e.g., 2006-01-02T15:04:05Z)
-        end_date: Optional end date in RFC3339 format (e.g., 2006-01-02T15:04:05Z)
-        min_distance: Optional minimum trip distance (units based on TeslaMate settings)
-        max_distance: Optional maximum trip distance (units based on TeslaMate settings)
-    """
-    bearer_token = _extract_teslamate_bearer_token(ctx)
-    return _execute(
-        teslamate_module.get_car_drives,
-        car_id=car_id,
-        start_date=start_date,
-        end_date=end_date,
-        min_distance=min_distance,
-        max_distance=max_distance,
-        bearer_token=bearer_token,
-        endpoint=_extract_teslamate_endpoint(ctx),
-        auth_type=_extract_teslamate_auth_type(ctx),
-    )
-
-
-@tesla_tool(read_only=True, destructive=False, open_world=True, tags={"teslamate"})
-def teslamate_get_car_drive(car_id: int, drive_id: int, ctx: Context):
-    """
-    Get detailed information about a specific driving session from TeslaMate.
-    
-    Args:
-        car_id: The TeslaMate car ID
-        drive_id: The driving session ID
-    """
-    bearer_token = _extract_teslamate_bearer_token(ctx)
-    return _execute(
-        teslamate_module.get_car_drive,
-        car_id=car_id,
-        drive_id=drive_id,
-        bearer_token=bearer_token,
-        endpoint=_extract_teslamate_endpoint(ctx),
-        auth_type=_extract_teslamate_auth_type(ctx),
-    )
-
-
-@tesla_tool(read_only=True, destructive=False, open_world=True, tags={"teslamate"})
-def teslamate_get_car_status(car_id: int, ctx: Context):
-    """
-    Get current status of a specific car from TeslaMate.
-    
-    Args:
-        car_id: The TeslaMate car ID
-        
-    Returns current status information including location, charge state, etc.
-    """
-    bearer_token = _extract_teslamate_bearer_token(ctx)
-    return _execute(
-        teslamate_module.get_car_status,
-        car_id=car_id,
-        bearer_token=bearer_token,
-        endpoint=_extract_teslamate_endpoint(ctx),
-        auth_type=_extract_teslamate_auth_type(ctx),
-    )
-
-
-@tesla_tool(read_only=True, destructive=False, open_world=True, tags={"teslamate"})
-def teslamate_get_car_updates(car_id: int, ctx: Context):
-    """
-    Get software updates information for a specific car from TeslaMate.
-
-    Args:
-        car_id: The TeslaMate car ID
-
-    Returns information about available and installed software updates.
-    """
-    bearer_token = _extract_teslamate_bearer_token(ctx)
-    return _execute(
-        teslamate_module.get_car_updates,
-        car_id=car_id,
-        bearer_token=bearer_token,
-        endpoint=_extract_teslamate_endpoint(ctx),
-        auth_type=_extract_teslamate_auth_type(ctx),
-    )
-
-
-@tesla_tool(read_only=True, destructive=False, open_world=True, tags={"teslamate"})
-def teslamate_get_car_charges_current(car_id: int, ctx: Context):
-    """
-    Get the currently active charging session for a specific car from TeslaMate.
-
-    Args:
-        car_id: The TeslaMate car ID
-
-    Returns the in-progress charging session, or empty if the car is not charging.
-    """
-    bearer_token = _extract_teslamate_bearer_token(ctx)
-    return _execute(
-        teslamate_module.get_car_charges_current,
-        car_id=car_id,
-        bearer_token=bearer_token,
-        endpoint=_extract_teslamate_endpoint(ctx),
-        auth_type=_extract_teslamate_auth_type(ctx),
-    )
+mcp.mount(build_teslamate_server(teslamate_module, app_csp=APP_CSP), namespace="teslamate")
+mcp.mount(build_teslamate_apps_server(teslamate_module, app_csp=APP_CSP), namespace="teslamate")
 
 
 @mcp.custom_route("/health", methods=["GET"])
