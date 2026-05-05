@@ -103,55 +103,83 @@ class TeslaMateAPIModule(TeslaModule):
         return self.client.get(f"/api/v1/cars/{car_id}/charges", context=context, params=params)
 
     def get_car_charge(
-        self, 
-        car_id: int, 
-        charge_id: int, 
-        *, 
+        self,
+        car_id: int,
+        charge_id: int,
+        *,
         bearer_token: str,
         endpoint: str,
         auth_type: str = "bearer"
     ) -> Dict[str, Any]:
         """
         Get detailed information about a specific charging session.
-        
+
         Args:
             car_id: The TeslaMate car ID
             charge_id: The charging session ID
-            
+
         Returns:
             Detailed charging session information
         """
         context = self._get_teslamate_context(bearer_token, endpoint, auth_type)
         return self.client.get(f"/api/v1/cars/{car_id}/charges/{charge_id}", context=context)
 
+    def get_car_charges_current(
+        self,
+        car_id: int,
+        *,
+        bearer_token: str,
+        endpoint: str,
+        auth_type: str = "bearer",
+    ) -> Dict[str, Any]:
+        """
+        Get the currently active charging session for a specific car.
+
+        Args:
+            car_id: The TeslaMate car ID
+
+        Returns:
+            Current charging session information, or empty if not charging
+        """
+        context = self._get_teslamate_context(bearer_token, endpoint, auth_type)
+        return self.client.get(f"/api/v1/cars/{car_id}/charges/current", context=context)
+
     def get_car_drives(
-        self, 
-        car_id: int, 
-        *, 
+        self,
+        car_id: int,
+        *,
         bearer_token: str,
         endpoint: str,
         auth_type: str = "bearer",
         start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        end_date: Optional[str] = None,
+        min_distance: Optional[float] = None,
+        max_distance: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Get driving sessions for a specific car.
-        
+
         Args:
             car_id: The TeslaMate car ID
             start_date: Optional start date in RFC3339 format (e.g., 2006-01-02T15:04:05Z)
             end_date: Optional end date in RFC3339 format (e.g., 2006-01-02T15:04:05Z)
-            
+            min_distance: Optional minimum trip distance (units based on TeslaMate settings)
+            max_distance: Optional maximum trip distance (units based on TeslaMate settings)
+
         Returns:
             List of driving sessions
         """
         context = self._get_teslamate_context(bearer_token, endpoint, auth_type)
-        params = {}
+        params: Dict[str, Any] = {}
         if start_date:
             params["startDate"] = start_date
         if end_date:
             params["endDate"] = end_date
-            
+        if min_distance is not None:
+            params["minDistance"] = min_distance
+        if max_distance is not None:
+            params["maxDistance"] = max_distance
+
         return self.client.get(f"/api/v1/cars/{car_id}/drives", context=context, params=params)
 
     def get_car_drive(
@@ -192,12 +220,13 @@ class TeslaMateAPIModule(TeslaModule):
     def get_car_updates(self, car_id: int, *, bearer_token: str, endpoint: str, auth_type: str = "bearer") -> Dict[str, Any]:
         """
         Get software updates information for a specific car.
-        
+
         Args:
             car_id: The TeslaMate car ID
-            
+
         Returns:
             Software updates information
         """
         context = self._get_teslamate_context(bearer_token, endpoint, auth_type)
         return self.client.get(f"/api/v1/cars/{car_id}/updates", context=context)
+

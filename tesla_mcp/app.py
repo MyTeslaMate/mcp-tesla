@@ -1690,18 +1690,22 @@ def teslamate_get_car_charge(car_id: int, charge_id: int, ctx: Context):
 
 @tesla_tool(read_only=True, destructive=False, open_world=True, tags={"teslamate"})
 def teslamate_get_car_drives(
-    car_id: int, 
+    car_id: int,
     ctx: Context,
     start_date: Optional[str] = None,
-    end_date: Optional[str] = None
+    end_date: Optional[str] = None,
+    min_distance: Optional[float] = None,
+    max_distance: Optional[float] = None,
 ):
     """
     Get driving sessions for a specific car from TeslaMate.
-    
+
     Args:
         car_id: The TeslaMate car ID
         start_date: Optional start date in RFC3339 format (e.g., 2006-01-02T15:04:05Z)
         end_date: Optional end date in RFC3339 format (e.g., 2006-01-02T15:04:05Z)
+        min_distance: Optional minimum trip distance (units based on TeslaMate settings)
+        max_distance: Optional maximum trip distance (units based on TeslaMate settings)
     """
     bearer_token = _extract_teslamate_bearer_token(ctx)
     return _execute(
@@ -1709,6 +1713,8 @@ def teslamate_get_car_drives(
         car_id=car_id,
         start_date=start_date,
         end_date=end_date,
+        min_distance=min_distance,
+        max_distance=max_distance,
         bearer_token=bearer_token,
         endpoint=_extract_teslamate_endpoint(ctx),
         auth_type=_extract_teslamate_auth_type(ctx),
@@ -1759,15 +1765,35 @@ def teslamate_get_car_status(car_id: int, ctx: Context):
 def teslamate_get_car_updates(car_id: int, ctx: Context):
     """
     Get software updates information for a specific car from TeslaMate.
-    
+
     Args:
         car_id: The TeslaMate car ID
-        
+
     Returns information about available and installed software updates.
     """
     bearer_token = _extract_teslamate_bearer_token(ctx)
     return _execute(
         teslamate_module.get_car_updates,
+        car_id=car_id,
+        bearer_token=bearer_token,
+        endpoint=_extract_teslamate_endpoint(ctx),
+        auth_type=_extract_teslamate_auth_type(ctx),
+    )
+
+
+@tesla_tool(read_only=True, destructive=False, open_world=True, tags={"teslamate"})
+def teslamate_get_car_charges_current(car_id: int, ctx: Context):
+    """
+    Get the currently active charging session for a specific car from TeslaMate.
+
+    Args:
+        car_id: The TeslaMate car ID
+
+    Returns the in-progress charging session, or empty if the car is not charging.
+    """
+    bearer_token = _extract_teslamate_bearer_token(ctx)
+    return _execute(
+        teslamate_module.get_car_charges_current,
         car_id=car_id,
         bearer_token=bearer_token,
         endpoint=_extract_teslamate_endpoint(ctx),
