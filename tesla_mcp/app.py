@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 
 from fastmcp import Context, FastMCP
 from fastmcp.server.middleware import Middleware, MiddlewareContext
+from fastmcp.utilities.types import Image
 from mcp.types import Icon
 
 
@@ -73,6 +74,33 @@ APP_CSP = {
     "base_uri_domains": [],
 }
 
+
+_ASSETS_DIR = Path(__file__).parent / "assets"
+
+
+def _build_app_icons() -> list[Icon]:
+    """Embed local icons as data URIs (SVG primary, PNG raster fallback)."""
+    icons: list[Icon] = []
+    svg_path = _ASSETS_DIR / "logo.svg"
+    if svg_path.exists():
+        icons.append(
+            Icon(
+                src=Image(path=svg_path, format="svg+xml").to_data_uri(),
+                mimeType="image/svg+xml",
+                sizes=["any"],
+            )
+        )
+    png_path = _ASSETS_DIR / "icon.png"
+    if png_path.exists():
+        icons.append(
+            Icon(
+                src=Image(path=png_path).to_data_uri(),
+                mimeType="image/png",
+                sizes=["1024x1024"],
+            )
+        )
+    return icons
+
 mcp_port = int(os.environ.get("PORT", 8084))
 openai_apps_challenge_token = os.environ.get(
     "OPENAI_APPS_CHALLENGE_TOKEN",
@@ -82,7 +110,7 @@ _tesla_oauth_client_id = os.environ.get("TESLA_OAUTH_CLIENT_ID")
 mcp = FastMCP(
     "MyTeslaMate MCP",
     auth=TeslaProvider() if _tesla_oauth_client_id else None,
-    icons=[Icon(src="https://www.myteslamate.com/wp-content/uploads/2026/04/splash-icon.png", mimeType="image/png")],
+    icons=_build_app_icons(),
     website_url="https://app.myteslamate.com",
 )
 client = TeslaClient()

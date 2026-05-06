@@ -76,20 +76,25 @@ def build_tasks_demo_server(
     return mcp
 
 
-def _coerce_cars(payload: Any) -> list[dict[str, Any]]:
+def _coerce_cars(payload: Any, _depth: int = 0) -> list[dict[str, Any]]:
     """Best-effort extraction of the cars list from a TeslaMate response.
 
-    The API has been seen to return either ``{"data": [...]}``, ``[...]``
-    directly, or a dict with a different envelope key. Try the common shapes
-    and fall back to the first list-typed value found in a dict.
+    The API has been seen wrapping the list under several layers, e.g.
+    ``{"data": {"cars": [...]}}`` or just ``{"data": [...]}`` or ``[...]``
+    directly. Recurse through known envelope keys up to a small depth, and
+    fall back to the first list-of-dicts found in a dict's values.
     """
     if isinstance(payload, list):
         return [c for c in payload if isinstance(c, dict)]
-    if isinstance(payload, dict):
-        for key in ("data", "cars", "results", "items"):
+    if isinstance(payload, dict) and _depth < 4:
+        for key in ("cars", "data", "results", "items"):
             value = payload.get(key)
-            if isinstance(value, list):
+            if isinstance(value, list) and (not value or isinstance(value[0], dict)):
                 return [c for c in value if isinstance(c, dict)]
+            if isinstance(value, dict):
+                nested = _coerce_cars(value, _depth + 1)
+                if nested:
+                    return nested
         for value in payload.values():
             if isinstance(value, list) and value and isinstance(value[0], dict):
                 return value
