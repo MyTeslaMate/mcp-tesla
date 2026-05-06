@@ -60,25 +60,19 @@ def build_teslamate_server(
         ctx: Context,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
     ):
-        """Charging sessions for a specific car.
+        """Charging sessions for a specific car. Filter only by date range.
 
         Args:
             car_id: The TeslaMate car ID
             start_date: Optional start date in RFC3339 format (e.g., 2006-01-02T15:04:05Z)
             end_date: Optional end date in RFC3339 format
-            limit: Optional max number of sessions to return
-            offset: Optional offset for pagination
         """
         return execute(
             teslamate_module.get_car_charges,
             car_id=car_id,
             start_date=start_date,
             end_date=end_date,
-            limit=limit,
-            offset=offset,
             **teslamate_auth_kwargs(ctx),
         )
 
@@ -118,10 +112,8 @@ def build_teslamate_server(
         end_date: Optional[str] = None,
         min_distance: Optional[float] = None,
         max_distance: Optional[float] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
     ):
-        """Driving sessions for a specific car.
+        """Driving sessions for a specific car. Filter by date range or distance.
 
         Args:
             car_id: The TeslaMate car ID
@@ -129,8 +121,6 @@ def build_teslamate_server(
             end_date: Optional end date in RFC3339 format
             min_distance: Optional minimum trip distance (TeslaMate units)
             max_distance: Optional maximum trip distance (TeslaMate units)
-            limit: Optional max number of drives to return
-            offset: Optional offset for pagination
         """
         return execute(
             teslamate_module.get_car_drives,
@@ -139,8 +129,6 @@ def build_teslamate_server(
             end_date=end_date,
             min_distance=min_distance,
             max_distance=max_distance,
-            limit=limit,
-            offset=offset,
             **teslamate_auth_kwargs(ctx),
         )
 

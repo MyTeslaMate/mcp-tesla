@@ -17,7 +17,16 @@ from .auth_context import (
 )
 from .base import TeslaClient
 
-from .modules import VehicleEndpoints, VehicleCommandsModule, EnergyModule, ChargingModule, UserModule, TeslaMateAPIModule
+from .modules import (
+    VehicleEndpoints,
+    VehicleCommandsModule,
+    EnergyModule,
+    ChargingModule,
+    UserModule,
+    TeslaMateAPIModule,
+    PVFollowConfigStore,
+    PVFollowRegistry,
+)
 from .oauth import TeslaProvider
 
 from starlette.responses import JSONResponse, PlainTextResponse
@@ -83,6 +92,8 @@ energy_module = EnergyModule(client)
 charging_module = ChargingModule(client)
 user_module = UserModule(client)
 teslamate_module = TeslaMateAPIModule(client)
+pv_follow_config_store = PVFollowConfigStore(client)
+pv_follow_registry = PVFollowRegistry()
 
 
 def tesla_tool(
@@ -1461,9 +1472,26 @@ def get_user_orders(ctx: Context):
 
 from .servers.teslamate_server import build_teslamate_server
 from .servers.teslamate_apps import build_teslamate_apps_server
+from .servers.pv_follow_server import build_pv_follow_server
+from .servers.tasks_demo_server import build_tasks_demo_server
 
 mcp.mount(build_teslamate_server(teslamate_module, app_csp=APP_CSP), namespace="teslamate")
 mcp.mount(build_teslamate_apps_server(teslamate_module, app_csp=APP_CSP), namespace="teslamate")
+mcp.mount(
+    build_pv_follow_server(
+        energy_module=energy_module,
+        commands_module=commands_module,
+        vehicle_module=vehicle_module,
+        config_store=pv_follow_config_store,
+        registry=pv_follow_registry,
+        app_csp=APP_CSP,
+    ),
+    namespace="pv_follow",
+)
+mcp.mount(
+    build_tasks_demo_server(teslamate_module=teslamate_module, app_csp=APP_CSP),
+    namespace="demo",
+)
 
 
 @mcp.custom_route("/health", methods=["GET"])

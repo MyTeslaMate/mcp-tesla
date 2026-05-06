@@ -6,6 +6,13 @@ from .energy import EnergyModule
 from .charging import ChargingModule
 from .user import UserModule
 from .teslamateapi import TeslaMateAPIModule
+from .pv_follow import (
+    PVFollowConfig,
+    PVFollowConfigStore,
+    PVFollowRegistry,
+    PVFollowSession,
+    PVFollowState,
+)
 
 __all__ = [
     "VehicleEndpoints",
@@ -14,4 +21,9 @@ __all__ = [
     "ChargingModule",
     "UserModule",
     "TeslaMateAPIModule",
+    "PVFollowConfig",
+    "PVFollowConfigStore",
+    "PVFollowRegistry",
+    "PVFollowSession",
+    "PVFollowState",
 ]

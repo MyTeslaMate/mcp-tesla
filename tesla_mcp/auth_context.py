@@ -152,6 +152,7 @@ def make_tesla_tool(server: FastMCP, app_csp: dict[str, Any]):
         open_world: bool = True,
         output_template: str | None = None,
         app: bool | dict[str, Any] | None = None,
+        task: bool = False,
     ):
         kwargs: dict[str, Any] = dict(
             tags=tags,
@@ -164,6 +165,8 @@ def make_tesla_tool(server: FastMCP, app_csp: dict[str, Any]):
         )
         if output_template is not None:
             kwargs["meta"] = {"openai/outputTemplate": output_template}
+        if task:
+            kwargs["task"] = True
         return server.tool(**kwargs)
 
     return tesla_tool

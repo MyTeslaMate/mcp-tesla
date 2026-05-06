@@ -81,8 +81,6 @@ class TeslaMateAPIModule(TeslaModule):
         auth_type: str = "bearer",
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Get charging sessions for a specific car.
@@ -91,8 +89,6 @@ class TeslaMateAPIModule(TeslaModule):
             car_id: The TeslaMate car ID
             start_date: Optional start date in RFC3339 format (e.g., 2006-01-02T15:04:05Z)
             end_date: Optional end date in RFC3339 format (e.g., 2006-01-02T15:04:05Z)
-            limit: Optional max number of results
-            offset: Optional offset for pagination
 
         Returns:
             List of charging sessions
@@ -103,10 +99,6 @@ class TeslaMateAPIModule(TeslaModule):
             params["startDate"] = start_date
         if end_date:
             params["endDate"] = end_date
-        if limit is not None:
-            params["limit"] = limit
-        if offset is not None:
-            params["offset"] = offset
 
         return self.client.get(f"/api/v1/cars/{car_id}/charges", context=context, params=params)
 
@@ -163,8 +155,6 @@ class TeslaMateAPIModule(TeslaModule):
         end_date: Optional[str] = None,
         min_distance: Optional[float] = None,
         max_distance: Optional[float] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Get driving sessions for a specific car.
@@ -175,8 +165,6 @@ class TeslaMateAPIModule(TeslaModule):
             end_date: Optional end date in RFC3339 format (e.g., 2006-01-02T15:04:05Z)
             min_distance: Optional minimum trip distance (units based on TeslaMate settings)
             max_distance: Optional maximum trip distance (units based on TeslaMate settings)
-            limit: Optional max number of results
-            offset: Optional offset for pagination
 
         Returns:
             List of driving sessions
@@ -191,10 +179,6 @@ class TeslaMateAPIModule(TeslaModule):
             params["minDistance"] = min_distance
         if max_distance is not None:
             params["maxDistance"] = max_distance
-        if limit is not None:
-            params["limit"] = limit
-        if offset is not None:
-            params["offset"] = offset
 
         return self.client.get(f"/api/v1/cars/{car_id}/drives", context=context, params=params)
 
