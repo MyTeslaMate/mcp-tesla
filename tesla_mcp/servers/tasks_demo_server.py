@@ -9,6 +9,7 @@ reachable as ``demo_list_cars``.
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import Any
 
 from fastmcp import Context, FastMCP
@@ -31,46 +32,70 @@ def build_tasks_demo_server(
     tesla_tool = make_tesla_tool(mcp, app_csp)
 
     @tesla_tool(read_only=True, destructive=False, open_world=True, task=True, tags=_TAGS)
-    async def list_cars(
+    async def poll_cars(
         ctx: Context,
-        per_car_delay_s: float = 0.5,
+        iterations: int = 10,
+        interval_s: float = 3.0,
         progress: Progress = Progress(),
     ) -> dict:
-        """List TeslaMate cars as a long-running background task.
+        """Periodically poll TeslaMate cars to exercise the Tasks scheduler.
 
-        Reads the cars from the TeslaMate API and emits one progress tick per
-        car. Used to validate the FastMCP Tasks plumbing end-to-end (task_id
-        handoff, Docket worker, progress reporting, structured result).
+        Re-fetches the cars list ``iterations`` times, sleeping ``interval_s``
+        between calls, and accumulates per-tick snapshots. The point isn't the
+        data — it's to drive a genuinely long-running async loop so you can
+        observe progress, task_id tracking, and Docket worker scheduling
+        end-to-end.
 
         Args:
-            per_car_delay_s: Artificial delay between cars so progress is
-                observable in clients. Set to 0 for a real-speed run.
+            iterations: Number of polls (default 10).
+            interval_s: Seconds between polls (default 3.0).
         """
         auth_kwargs = teslamate_auth_kwargs(ctx)
-        payload = teslamate_module.get_cars(**auth_kwargs)
-        cars = _coerce_cars(payload)
+        iterations = max(1, iterations)
+        await progress.set_total(iterations)
 
-        await progress.set_total(max(1, len(cars)))
+        snapshots: list[dict[str, Any]] = []
+        last_payload: Any = None
+        last_error: str | None = None
 
-        for idx, car in enumerate(cars, start=1):
-            car_id = car.get("car_id") or car.get("id") if isinstance(car, dict) else None
-            name = car.get("name") or car.get("display_name") if isinstance(car, dict) else None
-            await progress.set_message(f"car {idx}/{len(cars)}: id={car_id} name={name}")
-            await progress.increment()
-            if per_car_delay_s > 0 and idx < len(cars):
-                await asyncio.sleep(per_car_delay_s)
+        for tick in range(1, iterations + 1):
+            ts = time.time()
+            try:
+                payload = teslamate_module.get_cars(**auth_kwargs)
+                cars = _coerce_cars(payload)
+                last_payload = payload
+                last_error = None
+            except Exception as exc:  # noqa: BLE001
+                cars = []
+                last_error = str(exc)
 
-        if not cars:
-            await progress.set_message(
-                f"no cars in payload (type={type(payload).__name__})"
+            snapshots.append(
+                {
+                    "tick": tick,
+                    "ts": ts,
+                    "count": len(cars),
+                    "first_car": cars[0] if cars else None,
+                    "error": last_error,
+                }
             )
 
+            await progress.set_message(
+                f"tick {tick}/{iterations} cars={len(cars)}"
+                + (f" error={last_error}" if last_error else "")
+            )
+            await progress.increment()
+
+            if tick < iterations:
+                await asyncio.sleep(interval_s)
+
         return {
-            "count": len(cars),
-            "cars": cars,
-            "payload_type": type(payload).__name__,
-            "payload_keys": list(payload.keys()) if isinstance(payload, dict) else None,
-            "raw": payload,
+            "iterations": iterations,
+            "interval_s": interval_s,
+            "snapshots": snapshots,
+            "last_payload_type": type(last_payload).__name__,
+            "last_payload_keys": list(last_payload.keys())
+            if isinstance(last_payload, dict)
+            else None,
         }
 
     return mcp
