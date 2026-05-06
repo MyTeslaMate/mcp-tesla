@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import List, Optional
 from urllib.parse import urlparse
 
 from fastmcp import Context, FastMCP
@@ -1495,12 +1494,11 @@ mcp.mount(build_teslamate_server(teslamate_module, app_csp=APP_CSP), namespace="
 mcp.mount(build_teslamate_apps_server(teslamate_module, app_csp=APP_CSP), namespace="teslamate")
 
 # === Generative UI (LLM-authored Prefab apps, sandboxed in Pyodide) ===
-from prefab_ui.app import PrefabApp
-from fastmcp.apps.generative import get_generative_renderer_csp
-from prefab_ui.generative import (
-    execute as _execute_generative_prefab_ui,
-    search_components as _search_prefab_components,
-)
+from fastmcp.apps.generative import GenerativeUI
+from fastmcp.server.transforms import ToolTransform
+from fastmcp.tools.tool_transform import ToolTransformConfig
+
+mcp.add_provider(GenerativeUI())
 
 
 _GENERATIVE_DESCRIPTION = """
@@ -1526,64 +1524,23 @@ Required-field cheatsheet (forgetting these raises Pydantic "missing"):
 """.strip()
 
 
-# Include teslamate so subscription-filtered users only see the generic TeslaMate
-# UI generator when their MyTeslaMate subscription exposes TeslaMate data tools.
-_GENERATIVE_TAGS = {"generative", "ui", "teslamate"}
-_GENERATIVE_ANNOTATIONS = {
-    "readOnlyHint": True,
-    "destructiveHint": False,
-    "openWorldHint": False,
-}
-_GENERATIVE_APP_CSP = get_generative_renderer_csp()
-_GENERATIVE_SANDBOX = None
-
-
-def _get_generative_sandbox():
-    """Lazily create the Pyodide sandbox used by generated Prefab apps."""
-    global _GENERATIVE_SANDBOX
-    if _GENERATIVE_SANDBOX is None:
-        from prefab_ui.sandbox import Sandbox
-
-        _GENERATIVE_SANDBOX = Sandbox()
-    return _GENERATIVE_SANDBOX
-
-
-@mcp.tool(
-    name="generative_generate_prefab_ui",
-    description=_GENERATIVE_DESCRIPTION,
-    tags=_GENERATIVE_TAGS,
-    annotations=_GENERATIVE_ANNOTATIONS,
-    app={"resourceUri": "ui://prefab/renderer.html", "csp": _GENERATIVE_APP_CSP},
-)
-async def generative_generate_prefab_ui(
-    code: str,
-    data: str | dict[str, Any] | None = None,
-) -> PrefabApp:
-    parsed_data: dict[str, Any] | None
-    if isinstance(data, str):
-        parsed_data = json.loads(data) if data.strip() else None
-    else:
-        parsed_data = data
-
-    return await _execute_generative_prefab_ui(
-        code,
-        data=parsed_data,
-        sandbox=_get_generative_sandbox(),
+# Rename the canonical provider tools to the namespaced names ChatGPT learned,
+# and tag them so subscription-filtering picks them up alongside teslamate UI.
+mcp.add_transform(
+    ToolTransform(
+        {
+            "generate_prefab_ui": ToolTransformConfig(
+                name="generative_generate_prefab_ui",
+                tags={"generative", "ui", "teslamate"},
+                description=_GENERATIVE_DESCRIPTION,
+            ),
+            "search_prefab_components": ToolTransformConfig(
+                name="generative_search_prefab_components",
+                tags={"generative", "ui", "teslamate"},
+            ),
+        }
     )
-
-
-@mcp.tool(
-    name="generative_search_prefab_components",
-    tags=_GENERATIVE_TAGS,
-    annotations=_GENERATIVE_ANNOTATIONS,
 )
-def generative_search_prefab_components(
-    query: str = "",
-    detail: bool | None = None,
-    limit: int | None = None,
-) -> str:
-    """Search the Prefab component library before generating Prefab UI code."""
-    return _search_prefab_components(query=query, detail=detail, limit=limit)
 
 
 class GenerativeLoggingMiddleware(Middleware):
