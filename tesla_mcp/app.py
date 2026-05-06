@@ -1501,6 +1501,51 @@ from fastmcp.tools.tool_transform import ToolTransformConfig
 mcp.add_provider(GenerativeUI())
 
 
+# GenerativeUI registers `ui://prefab/generative.html` with mime
+# `text/html;profile=mcp-app` (FastMCP Apps protocol). The OpenAI Apps SDK /
+# ChatGPT only renders `text/html+skybridge`, so we expose a parallel resource
+# with the Skybridge mime that pulls the same body from the underlying
+# generator. The transform below points `openai/outputTemplate` at this
+# alias.
+_PREFAB_GENERATIVE_CSP = {
+    "connectDomains": [
+        _normalize_origin(os.environ.get("TESLA_OAUTH_BASE_URL"))
+        or "https://mcp.myteslamate.com",
+        "https://cdn.jsdelivr.net",
+        "https://pypi.org",
+        "https://files.pythonhosted.org",
+    ],
+    "resourceDomains": ["https://cdn.jsdelivr.net"],
+}
+
+PREFAB_GENERATIVE_WIDGET_META = {
+    "ui": {
+        "domain": _normalize_origin(os.environ.get("TESLA_OAUTH_BASE_URL"))
+        or "https://mcp.myteslamate.com",
+        "csp": _PREFAB_GENERATIVE_CSP,
+    },
+    "openai/widgetDescription": "Generative UI renderer for LLM-authored Prefab components.",
+}
+
+
+@mcp.resource(
+    uri="ui://prefab/generative-skybridge.html",
+    name="Prefab Generative Renderer (Skybridge)",
+    mime_type="text/html+skybridge",
+    meta=PREFAB_GENERATIVE_WIDGET_META,
+)
+async def prefab_generative_skybridge_widget() -> str:
+    """Skybridge-mime mirror of FastMCP's Prefab generative renderer."""
+    res = await mcp.get_resource("ui://prefab/generative.html")
+    if res is None:
+        return ""
+    body = await res.read()
+    contents = getattr(body, "contents", None) or []
+    if not contents:
+        return ""
+    return getattr(contents[0], "content", "") or ""
+
+
 _GENERATIVE_DESCRIPTION = """
 Generate a custom interactive UI on demand for cases not covered by the
 specialized teslamate_* / pv_follow_* tools.
@@ -1533,6 +1578,16 @@ mcp.add_transform(
                 name="generative_generate_prefab_ui",
                 tags={"generative", "ui", "teslamate"},
                 description=_GENERATIVE_DESCRIPTION,
+                # Replace meta entirely: keep the FastMCP `ui` block (for
+                # native MCP-app clients) AND add `openai/outputTemplate` so
+                # the OpenAI Apps SDK / ChatGPT picks up the Skybridge mirror.
+                meta={
+                    "openai/outputTemplate": "ui://prefab/generative-skybridge.html",
+                    "ui": {
+                        "resourceUri": "ui://prefab/generative.html",
+                        "csp": _PREFAB_GENERATIVE_CSP,
+                    },
+                },
             ),
             "search_prefab_components": ToolTransformConfig(
                 name="generative_search_prefab_components",
