@@ -1495,8 +1495,99 @@ mcp.mount(build_teslamate_apps_server(teslamate_module, app_csp=APP_CSP), namesp
 
 # === Generative UI (LLM-authored Prefab apps, sandboxed in Pyodide) ===
 from fastmcp.apps.generative import GenerativeUI
+from fastmcp.server.transforms import ToolTransform
+from fastmcp.tools.tool_transform import ToolTransformConfig
 
 mcp.add_provider(GenerativeUI(), namespace="generative")
+
+
+_GENERATIVE_DESCRIPTION = """
+Generate a custom interactive UI on demand. Use this for visualizations,
+dashboards, comparisons, breakdowns or forms that ARE NOT covered by the
+specialized teslamate_* / pv_follow_* tools.
+
+REQUIRED WORKFLOW — to avoid runtime errors:
+
+1. BEFORE writing code, call `generative_search_prefab_components` for any
+   component whose API you are uncertain about. This returns the exact
+   keyword args, required fields, and import path. Do this for every
+   non-trivial component (charts, tables, forms, cards).
+2. ONLY import from these two paths:
+     from prefab_ui.app import PrefabApp
+     from prefab_ui.components import (Column, Row, Grid, Heading, Text,
+         Muted, Badge, Card, CardHeader, CardContent, CardTitle, Metric,
+         Progress, Alert, AlertTitle, AlertDescription, DataTable,
+         DataTableColumn, Tabs, Tab, Accordion, AccordionItem, Switch,
+         Slider, Input, Select, SelectOption, Button, ForEach, If, Rx, ...)
+     from prefab_ui.components.charts import (BarChart, LineChart,
+         AreaChart, PieChart, ChartSeries, ...)
+   There is NO `prefab_ui.components.navigation`, `forms`, `layout` etc.
+   Everything lives in `prefab_ui.components` (flat) or `.charts`.
+3. ALWAYS wrap the tree in a top-level `with PrefabApp() as app:` block —
+   this enables progressive streaming of the UI as you type.
+4. Required fields on common components (forgetting these raises a
+   Pydantic 'missing' error):
+     - Heading(content, level=1..4)
+     - Text(content=...)
+     - Muted(content=...)
+     - Badge(label=...)
+     - Metric(label=..., value=...)
+     - Progress(value=..., max=...)
+     - DataTableColumn(key=..., header=...)
+     - DataTable(columns=[...], rows=[...])
+     - BarChart(data=[...], series=[ChartSeries(data_key=...)], x_axis=...)
+     - ChartSeries(data_key=...)
+
+Pull data from `teslamate_get_*` tools first when the user asks about
+their car's history, then pipe the rows into your Prefab tree. For pure
+visual asks (no data), generate the UI directly.
+
+The `data` argument exposes values as global variables in the sandbox.
+""".strip()
+
+
+mcp.add_transform(
+    ToolTransform(
+        {
+            "generative_generate_prefab_ui": ToolTransformConfig(
+                tags={"generative", "ui"},
+                description=_GENERATIVE_DESCRIPTION,
+            ),
+        }
+    )
+)
+
+
+class GenerativeLoggingMiddleware(Middleware):
+    """Log generated Prefab code + full error when generative_generate_prefab_ui fails.
+
+    The MCP transport surfaces only the last line of Pydantic validation
+    errors back to the host, which makes debugging LLM-authored code
+    impossible. This captures the input and the full error in stderr so
+    they're visible in container logs.
+    """
+
+    async def on_call_tool(self, context: MiddlewareContext, call_next):
+        tool_name = getattr(context.message, "name", None)
+        try:
+            return await call_next(context)
+        except Exception as exc:
+            if tool_name == "generative_generate_prefab_ui":
+                args = getattr(context.message, "arguments", None) or {}
+                code = args.get("code", "")
+                logger.error(
+                    "[generative] FAILED — full error and submitted code below\n"
+                    "----- error -----\n%s\n"
+                    "----- code (%d chars) -----\n%s\n"
+                    "----- end -----",
+                    exc,
+                    len(code),
+                    code,
+                )
+            raise
+
+
+mcp.add_middleware(GenerativeLoggingMiddleware())
 
 
 @mcp.custom_route("/health", methods=["GET"])
