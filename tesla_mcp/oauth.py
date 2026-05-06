@@ -21,6 +21,8 @@ Environment variables:
 
 from __future__ import annotations
 
+import logging
+
 import httpx
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -29,6 +31,8 @@ from fastmcp.server.auth import TokenVerifier
 from fastmcp.server.auth.auth import AccessToken
 from fastmcp.server.auth.oauth_proxy import OAuthProxy
 from mcp.server.auth.provider import AuthorizationParams, OAuthClientInformationFull
+
+logger = logging.getLogger("tesla_mcp.oauth")
 
 TESLA_AUTH_URL = "https://fleet-auth.prd.vn.cloud.tesla.com/oauth2/v3/authorize"
 TESLA_TOKEN_URL = "https://fleet-auth.prd.vn.cloud.tesla.com/oauth2/v3/token"
@@ -90,21 +94,18 @@ class TeslaTokenVerifier(TokenVerifier):
                 },
             )
 
-        try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                r = await client.post(
-                    f"{self.mtm_base_url}/api/auth/exchange",
-                    json={"tesla_token": token},
-                )
-                if r.status_code != 200:
-                    return None
-                data = r.json()
-                mtm_token = data.get("token")
-                if not mtm_token:
-                    return None
-        except httpx.RequestError:
+        # Try Tesla → MTM exchange first (the OAuth-flow path used by ChatGPT
+        # and Claude.ai). Fall back to a direct MTM-token introspection so
+        # backend callers (e.g. the Laravel chat) that already hold an MTM
+        # bearer can also authenticate.
+        data = await self._exchange(token, key="tesla_token")
+        if data is None or not data.get("token"):
+            data = await self._exchange(token, key="mtm_token")
+        if data is None or not data.get("token"):
+            logger.info("verify_token: rejected (neither tesla_token nor mtm_token matched)")
             return None
 
+        mtm_token = data["token"]
         subscribe_api = bool(data.get("subscribe_api", False))
         subscribe_teslamate = bool(data.get("subscribe_teslamate", False))
         teslamate_api_endpoint = data.get("teslamate_api_endpoint", "")
@@ -129,6 +130,28 @@ class TeslaTokenVerifier(TokenVerifier):
                 "teslamate_auth_type": teslamate_auth_type,
             },
         )
+
+    async def _exchange(self, token: str, *, key: str) -> dict | None:
+        """POST {key: token} to /api/auth/exchange. Returns the JSON body on
+        2xx, None otherwise. Logs the outcome for diagnosis."""
+        url = f"{self.mtm_base_url}/api/auth/exchange"
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                r = await client.post(url, json={key: token})
+        except httpx.RequestError as exc:
+            logger.warning("verify_token: %s exchange failed network: %s", key, exc)
+            return None
+        if r.status_code != 200:
+            logger.info(
+                "verify_token: %s exchange returned %d (body=%s)",
+                key, r.status_code, r.text[:200],
+            )
+            return None
+        try:
+            return r.json()
+        except ValueError:
+            logger.warning("verify_token: %s exchange returned non-JSON", key)
+            return None
 
 
 class TeslaProvider(OAuthProxy):
@@ -201,3 +224,20 @@ class TeslaProvider(OAuthProxy):
         # Tesla does not support RFC 8707 resource indicators — strip it to avoid
         # "Invalid audience" errors on auth.tesla.com.
         return await super().authorize(client, params.model_copy(update={"resource": None}))
+
+    async def load_access_token(self, token: str) -> AccessToken | None:  # type: ignore[override]
+        """Validate the bearer.
+
+        Default behaviour delegates to ``OAuthProxy.load_access_token``, which
+        only accepts FastMCP-issued JWTs (the OAuth-flow path used by ChatGPT
+        and Claude.ai). When that path fails — typically because a backend
+        caller (e.g. our Laravel chat) sends a raw MyTeslaMate API token — we
+        fall back to the underlying ``TokenVerifier``. The verifier in turn
+        knows how to introspect both Tesla and MTM tokens via the MyTeslaMate
+        ``/api/auth/exchange`` endpoint.
+        """
+        result = await super().load_access_token(token)
+        if result is not None:
+            return result
+        logger.info("load_access_token: JWT path failed, trying raw bearer fallback")
+        return await self._token_validator.verify_token(token)
