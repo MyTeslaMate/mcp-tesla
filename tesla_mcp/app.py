@@ -1498,75 +1498,36 @@ from fastmcp.apps.generative import GenerativeUI
 from fastmcp.server.transforms import ToolTransform
 from fastmcp.tools.tool_transform import ToolTransformConfig
 
-mcp.add_provider(GenerativeUI(), namespace="generative")
+mcp.add_provider(GenerativeUI())
 
 
 _GENERATIVE_DESCRIPTION = """
-Generate a custom interactive UI on demand. Use this for visualizations,
-dashboards, comparisons, breakdowns or forms that ARE NOT covered by the
+Generate a custom interactive UI on demand for cases not covered by the
 specialized teslamate_* / pv_follow_* tools.
 
-REQUIRED WORKFLOW — to avoid runtime errors:
+Workflow:
+1. Call `search_prefab_components` whenever you're unsure of a component's
+   args — it returns the exact keyword names and required fields.
+2. Import only from `prefab_ui.app` and `prefab_ui.components(.charts)`.
+   Everything is flat under `prefab_ui.components` — there is NO
+   `navigation`, `forms`, or `layout` submodule.
+3. Always wrap the tree in `with PrefabApp() as app:` (enables streaming).
+4. Pull data from `teslamate_get_*` tools first if the request is about
+   the user's car. Pass it via the `data` argument; values become global
+   variables in the sandbox.
 
-1. BEFORE writing code, call `generative_search_prefab_components` for any
-   component whose API you are uncertain about. This returns the exact
-   keyword args, required fields, and import path. Do this for every
-   non-trivial component (charts, tables, forms, cards).
-2. ONLY import from these two paths:
-     from prefab_ui.app import PrefabApp
-     from prefab_ui.components import (Column, Row, Grid, Heading, Text,
-         Muted, Badge, Card, CardHeader, CardContent, CardTitle, Metric,
-         Progress, Alert, AlertTitle, AlertDescription, DataTable,
-         DataTableColumn, Tabs, Tab, Accordion, AccordionItem, Switch,
-         Slider, Input, Select, SelectOption, Button, ForEach, If, Rx, ...)
-     from prefab_ui.components.charts import (BarChart, LineChart,
-         AreaChart, PieChart, ChartSeries, ...)
-   There is NO `prefab_ui.components.navigation`, `forms`, `layout` etc.
-   Everything lives in `prefab_ui.components` (flat) or `.charts`.
-3. ALWAYS wrap the tree in a top-level `with PrefabApp() as app:` block —
-   this enables progressive streaming of the UI as you type.
-4. Required fields on common components (forgetting these raises a
-   Pydantic 'missing' error):
-     - Heading(content, level=1..4)
-     - Text(content=...)
-     - Muted(content=...)
-     - Badge(label=...)
-     - Metric(label=..., value=...)
-     - Progress(value=..., max=...)
-     - DataTableColumn(key=..., header=...)
-     - DataTable(columns=[...], rows=[...])
-     - BarChart(data=[...], series=[ChartSeries(data_key=...)], x_axis=...)
-     - ChartSeries(data_key=...)
-
-5. CHARTS (BarChart / LineChart / AreaChart / PieChart) MUST be wrapped
-   in a sized parent or they render invisible (Recharts ResponsiveContainer
-   collapses to width=0 inside flex children without explicit width).
-   Either:
-     with Card(css_class="p-6"):
-         BarChart(...)
-   or:
-     with Column(css_class="w-full"):
-         BarChart(...)
-   Never put a raw chart directly under a `Column(gap=...)` without
-   wrapping — it will not render.
-
-6. For time-series with many points (>20), keep x-axis labels short
-   (e.g. "04-15" instead of full ISO "2026-04-15") or set
-   `y_axis_format="compact"` and trust the legend. Avoid stacking 50+
-   ticks on a small width; sample/aggregate the data first.
-
-Pull data from `teslamate_get_*` tools first when the user asks about
-their car's history, then pipe the rows into your Prefab tree. For pure
-visual asks (no data), generate the UI directly.
-
-The `data` argument exposes values as global variables in the sandbox.
+Required-field cheatsheet (forgetting these raises Pydantic "missing"):
+  Heading(content), Text(content=), Badge(label=), Metric(label=, value=),
+  Progress(value=, max=), DataTableColumn(key=, header=),
+  DataTable(columns=, rows=), BarChart(data=, series=, x_axis=),
+  ChartSeries(data_key=).
 """.strip()
 
 
 mcp.add_transform(
     ToolTransform(
         {
-            "generative_generate_prefab_ui": ToolTransformConfig(
+            "generate_prefab_ui": ToolTransformConfig(
                 tags={"generative", "ui"},
                 description=_GENERATIVE_DESCRIPTION,
             ),
@@ -1584,7 +1545,7 @@ class GenerativeLoggingMiddleware(Middleware):
     to disable success logging while keeping error logging.
     """
 
-    _GENERATIVE_TOOL = "generative_generate_prefab_ui"
+    _GENERATIVE_TOOL = "generate_prefab_ui"
     _LOG_SUCCESS = os.environ.get("GENERATIVE_DEBUG", "1") != "0"
 
     async def on_call_tool(self, context: MiddlewareContext, call_next):
