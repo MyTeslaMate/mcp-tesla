@@ -1559,20 +1559,23 @@ mcp.add_transform(
 
 
 class GenerativeLoggingMiddleware(Middleware):
-    """Log generated Prefab code + full error when generative_generate_prefab_ui fails.
+    """Log Prefab code submitted to ``generative_generate_prefab_ui``.
 
-    The MCP transport surfaces only the last line of Pydantic validation
-    errors back to the host, which makes debugging LLM-authored code
-    impossible. This captures the input and the full error in stderr so
-    they're visible in container logs.
+    Always logs the submitted code so we can see what the LLM produced —
+    useful both for failures (Pydantic errors, missing modules) and silent
+    issues (chart not rendering, empty data). Set ``GENERATIVE_DEBUG=0``
+    to disable success logging while keeping error logging.
     """
+
+    _GENERATIVE_TOOL = "generative_generate_prefab_ui"
+    _LOG_SUCCESS = os.environ.get("GENERATIVE_DEBUG", "1") != "0"
 
     async def on_call_tool(self, context: MiddlewareContext, call_next):
         tool_name = getattr(context.message, "name", None)
         try:
-            return await call_next(context)
+            result = await call_next(context)
         except Exception as exc:
-            if tool_name == "generative_generate_prefab_ui":
+            if tool_name == self._GENERATIVE_TOOL:
                 args = getattr(context.message, "arguments", None) or {}
                 code = args.get("code", "")
                 logger.error(
@@ -1585,6 +1588,25 @@ class GenerativeLoggingMiddleware(Middleware):
                     code,
                 )
             raise
+
+        if tool_name == self._GENERATIVE_TOOL and self._LOG_SUCCESS:
+            args = getattr(context.message, "arguments", None) or {}
+            code = args.get("code", "")
+            data = args.get("data")
+            data_repr = (
+                f"keys={list(data.keys())}"
+                if isinstance(data, dict)
+                else f"type={type(data).__name__}"
+                if data is not None
+                else "None"
+            )
+            logger.info(
+                "[generative] OK — code (%d chars), data %s\n----- code -----\n%s\n----- end -----",
+                len(code),
+                data_repr,
+                code,
+            )
+        return result
 
 
 mcp.add_middleware(GenerativeLoggingMiddleware())
