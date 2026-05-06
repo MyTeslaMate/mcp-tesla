@@ -1576,7 +1576,7 @@ mcp.add_transform(
         {
             "generate_prefab_ui": ToolTransformConfig(
                 name="generative_generate_prefab_ui",
-                tags={"generative", "ui", "teslamate"},
+                tags={"generative", "ui", "teslamate", "tesla_fleet_api"},
                 description=_GENERATIVE_DESCRIPTION,
                 # Replace meta entirely: keep the FastMCP `ui` block (for
                 # native MCP-app clients) AND add `openai/outputTemplate` so
@@ -1591,7 +1591,7 @@ mcp.add_transform(
             ),
             "search_prefab_components": ToolTransformConfig(
                 name="generative_search_prefab_components",
-                tags={"generative", "ui", "teslamate"},
+                tags={"generative", "ui", "teslamate", "tesla_fleet_api"},
             ),
         }
     )
@@ -1663,13 +1663,20 @@ async def openai_apps_challenge(request):
 
 
 # a middleware to filter tools based on subscription flags and "tags" query parameter
+_SUBSCRIPTION_TAGS = {"tesla_fleet_api", "teslamate"}
+
+
 class TagFilteringMiddleware(Middleware):
     async def on_list_tools(self, context: MiddlewareContext, call_next):
         result = await call_next(context)
 
         request = context.fastmcp_context.request_context.request
 
-        # Filter by subscription flags from OAuth claims (OAuth mode only)
+        # Filter by subscription flags from OAuth claims (OAuth mode only).
+        # A tool is dropped only if every subscription tag it carries is
+        # forbidden — so a tool tagged with BOTH `teslamate` and
+        # `tesla_fleet_api` survives as long as the user has either
+        # subscription. Tools without any subscription tag are always kept.
         forbidden_tags: set[str] = set()
         user = getattr(request, "user", None)
         if user and hasattr(user, "access_token"):
@@ -1679,7 +1686,12 @@ class TagFilteringMiddleware(Middleware):
             if not claims.get("subscribe_teslamate", False):
                 forbidden_tags.add("teslamate")
         if forbidden_tags:
-            result = [tool for tool in result if not (tool.tags & forbidden_tags)]
+            def _allowed(tool):
+                gating = tool.tags & _SUBSCRIPTION_TAGS
+                if not gating:
+                    return True
+                return not gating.issubset(forbidden_tags)
+            result = [tool for tool in result if _allowed(tool)]
 
         # Filter by explicit "tags" query parameter
         tags = request.query_params.getlist("tags")
