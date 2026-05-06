@@ -1538,6 +1538,23 @@ REQUIRED WORKFLOW — to avoid runtime errors:
      - BarChart(data=[...], series=[ChartSeries(data_key=...)], x_axis=...)
      - ChartSeries(data_key=...)
 
+5. CHARTS (BarChart / LineChart / AreaChart / PieChart) MUST be wrapped
+   in a sized parent or they render invisible (Recharts ResponsiveContainer
+   collapses to width=0 inside flex children without explicit width).
+   Either:
+     with Card(css_class="p-6"):
+         BarChart(...)
+   or:
+     with Column(css_class="w-full"):
+         BarChart(...)
+   Never put a raw chart directly under a `Column(gap=...)` without
+   wrapping — it will not render.
+
+6. For time-series with many points (>20), keep x-axis labels short
+   (e.g. "04-15" instead of full ISO "2026-04-15") or set
+   `y_axis_format="compact"` and trust the legend. Avoid stacking 50+
+   ticks on a small width; sample/aggregate the data first.
+
 Pull data from `teslamate_get_*` tools first when the user asks about
 their car's history, then pipe the rows into your Prefab tree. For pure
 visual asks (no data), generate the UI directly.
