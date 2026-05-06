@@ -2,9 +2,12 @@ FROM python:3.10
 
 WORKDIR /code
 
-RUN apt update
+RUN apt update && apt install -y --no-install-recommends curl unzip && rm -rf /var/lib/apt/lists/*
 
-#RUN pip install --upgrade pip
+# Deno is required by prefab_ui's server-side sandbox (generative_generate_prefab_ui).
+# Installed to /usr/local/bin so it's on PATH for shutil.which("deno").
+RUN curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh -s -- --yes \
+    && deno --version
 
 # Install app
 COPY ./requirements.txt /code/requirements.txt
