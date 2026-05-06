@@ -42,13 +42,66 @@ The AI can cross-reference your solar production, Powerwall state, grid rates, a
 
 ---
 
-**Available capabilities** (98 tools for Tesla Fleet API + 9 for TeslaMate API):
+## 🎨 Generative UI — Custom dashboards on demand
+
+Beyond pre-built widgets, the server exposes a **Generative UI** capability so the AI can build interactive Prefab UI components on the fly to answer with charts, tables and metric cards — not just text.
+
+> *"Show me a bar chart of my charging cost per location for last month."*
+
+> *"Build a dashboard for this car: current SoC, last 7 drives, and battery health degradation."*
+
+> *"Compare my efficiency this winter vs last summer with two side-by-side metric cards."*
+
+The AI uses `generative_generate_prefab_ui` to author Python code in a sandbox (Pyodide + Deno on the server); the resulting widget is rendered directly in your chat through a Skybridge-mime iframe — no template authoring on your side, no extra round-trip. The companion `generative_search_prefab_components` lookup tool keeps the LLM honest about component signatures.
+
+It works equally well for Tesla Fleet API and TeslaMate users — the same generative tool is gated by either subscription.
+
+### Skills — pre-framed analytical workflows
+
+The server also ships **MCP Skills**: markdown workflows the LLM reads on demand to chain tools into a coherent answer. The first one available is `drive-efficiency-coach`:
+
+> *"Run the drive efficiency coach for the last 30 days and show it as a report."*
+
+The skill walks the AI through fetching your TeslaMate drives, computing Wh/km percentiles, identifying outliers, cross-referencing speed/temperature/trip-length, and rendering a Generative UI report (metric cards + outliers table + 1–3 actionable coaching insights anchored in your own numbers).
+
+#### 🤝 Contribute a skill
+
+Skills are the easiest way to extend this server without touching Python. **Pull requests welcome** — drop a new directory under [`tesla_mcp/skills/`](tesla_mcp/skills/) and `SkillsDirectoryProvider` picks it up automatically.
+
+A good skill is:
+
+1. **Specific** — answers one concrete question well rather than trying to do everything (e.g. *"summarize my charging cost by location for a period"* beats *"manage my charging"*).
+2. **Tool-aware** — names the exact MCP tools to call (`teslamate_get_car_drives`, `energy_live_status`, …) and the right arguments.
+3. **Numerically anchored** — the coaching/insights step quotes numbers derived from the user's own data, not generic platitudes.
+4. **Visual when it helps** — wraps up with a `generative_generate_prefab_ui` render for analytics/reports; plain text for one-shot questions.
+5. **Honest about pitfalls** — calls out unit ambiguities, data gaps, edge cases the LLM should handle.
+
+Minimal layout:
+
+```
+tesla_mcp/skills/your-skill-name/
+└── SKILL.md
+```
+
+`SKILL.md` starts with YAML frontmatter (`name`, `description`) followed by the workflow. See [`drive-efficiency-coach/SKILL.md`](tesla_mcp/skills/drive-efficiency-coach/SKILL.md) as a reference.
+
+Ideas waiting for an author:
+- `charging-cost-breakdown` — group last month's charges by location, surface cost-per-100km
+- `weekly-tesla-digest` — drives + charges + battery snapshot + software updates as a Monday-morning email-style report
+- `range-anxiety-checker` — given a destination, cross-reference SoC, weather, elevation and recent efficiency to call out a stop or reassure
+- `home-charging-window-finder` — using TOU settings + recent charge sessions, find the cheapest 4-hour window to plug in tonight
+
+---
+
+**Available capabilities** (98 tools for Tesla Fleet API + 9 for TeslaMate API + 2 Generative UI tools + skills):
 - **Vehicle control**: lock/unlock, climate, trunk, windows, lights, horn
 - **Charging**: start/stop, set limits, schedule, charging amps, charge history
 - **Powerwall & Solar**: live status, energy history, backup reserve, storm mode, grid import/export, time-of-use settings
 - **Navigation**: send destinations, find nearby Superchargers
 - **Security**: Sentry mode, valet mode, speed limits, PIN to drive
 - **Data & analytics**: vehicle data, trip history, drive statistics *(TeslaMate API)*
+- **Generative UI**: on-demand Prefab dashboards (charts, metrics, tables) authored by the AI in a sandboxed Pyodide runtime
+- **Skills**: pre-framed analytical workflows (e.g. `drive-efficiency-coach`) the AI reads on demand to chain tools into a coherent answer
 
 ## 🔐 One-Click SSO — Connect with Your Tesla Account
 

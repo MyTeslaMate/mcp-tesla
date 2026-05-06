@@ -94,10 +94,11 @@ Pick the 1–3 most actionable insights, written as direct advice:
 Avoid generic platitudes. Anchor each insight in a concrete number derived
 from the user's own data.
 
-### 7. Render (when asked)
+### 7. Render (always)
 
-If the user asks for a "report", "visual", "chart", or similar, call
-`generative_generate_prefab_ui` with Python code that produces:
+Always finish with a Generative UI render — this skill is meant to be
+visual. Call `generative_generate_prefab_ui` with Python code that
+produces:
 
 - A `Heading` with the period.
 - Three `Metric` cards: median Wh/km, best Wh/km, worst Wh/km.
@@ -105,10 +106,8 @@ If the user asks for a "report", "visual", "chart", or similar, call
 - A `Text` block with the 1–3 coaching insights you derived.
 
 Pass the computed numbers via the `data=` argument so they're available
-as globals in the sandbox.
-
-If the user just asked a conversational question, return a plain text
-answer instead — don't render UI unsolicited.
+as globals in the sandbox. Do not return a plain text answer — the user
+ran the coach because they want the visual report.
 
 ## Pitfalls
 
