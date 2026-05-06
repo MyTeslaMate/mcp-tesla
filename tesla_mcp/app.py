@@ -1528,8 +1528,13 @@ mcp.add_transform(
     ToolTransform(
         {
             "generate_prefab_ui": ToolTransformConfig(
+                name="generative_generate_prefab_ui",
                 tags={"generative", "ui"},
                 description=_GENERATIVE_DESCRIPTION,
+            ),
+            "search_prefab_components": ToolTransformConfig(
+                name="generative_search_prefab_components",
+                tags={"generative", "ui"},
             ),
         }
     )
@@ -1545,7 +1550,7 @@ class GenerativeLoggingMiddleware(Middleware):
     to disable success logging while keeping error logging.
     """
 
-    _GENERATIVE_TOOL = "generate_prefab_ui"
+    _GENERATIVE_TOOL = "generative_generate_prefab_ui"
     _LOG_SUCCESS = os.environ.get("GENERATIVE_DEBUG", "1") != "0"
 
     async def on_call_tool(self, context: MiddlewareContext, call_next):
