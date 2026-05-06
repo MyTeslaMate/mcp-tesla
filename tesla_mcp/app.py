@@ -1493,6 +1493,13 @@ from .servers.teslamate_apps import build_teslamate_apps_server
 mcp.mount(build_teslamate_server(teslamate_module, app_csp=APP_CSP), namespace="teslamate")
 mcp.mount(build_teslamate_apps_server(teslamate_module, app_csp=APP_CSP), namespace="teslamate")
 
+# === Skills (markdown workflows the LLM reads on demand) ===
+from fastmcp.server.providers.skills import SkillsDirectoryProvider
+
+_SKILLS_DIR = Path(__file__).parent / "skills"
+if _SKILLS_DIR.is_dir():
+    mcp.add_provider(SkillsDirectoryProvider(_SKILLS_DIR))
+
 # === Generative UI (LLM-authored Prefab apps, sandboxed in Pyodide) ===
 from fastmcp.apps.generative import GenerativeUI
 from fastmcp.server.transforms import ToolTransform
