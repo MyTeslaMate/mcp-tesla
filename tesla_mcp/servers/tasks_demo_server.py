@@ -48,24 +48,49 @@ def build_tasks_demo_server(
         """
         auth_kwargs = teslamate_auth_kwargs(ctx)
         payload = teslamate_module.get_cars(**auth_kwargs)
-
-        cars = payload.get("data") if isinstance(payload, dict) else payload
-        if not isinstance(cars, list):
-            cars = []
+        cars = _coerce_cars(payload)
 
         await progress.set_total(max(1, len(cars)))
 
         for idx, car in enumerate(cars, start=1):
-            car_id = car.get("car_id") or car.get("id")
-            name = car.get("name") or car.get("display_name")
+            car_id = car.get("car_id") or car.get("id") if isinstance(car, dict) else None
+            name = car.get("name") or car.get("display_name") if isinstance(car, dict) else None
             await progress.set_message(f"car {idx}/{len(cars)}: id={car_id} name={name}")
             await progress.increment()
             if per_car_delay_s > 0 and idx < len(cars):
                 await asyncio.sleep(per_car_delay_s)
 
         if not cars:
-            await progress.set_message("no cars returned by TeslaMate API")
+            await progress.set_message(
+                f"no cars in payload (type={type(payload).__name__})"
+            )
 
-        return {"count": len(cars), "cars": cars}
+        return {
+            "count": len(cars),
+            "cars": cars,
+            "payload_type": type(payload).__name__,
+            "payload_keys": list(payload.keys()) if isinstance(payload, dict) else None,
+            "raw": payload,
+        }
 
     return mcp
+
+
+def _coerce_cars(payload: Any) -> list[dict[str, Any]]:
+    """Best-effort extraction of the cars list from a TeslaMate response.
+
+    The API has been seen to return either ``{"data": [...]}``, ``[...]``
+    directly, or a dict with a different envelope key. Try the common shapes
+    and fall back to the first list-typed value found in a dict.
+    """
+    if isinstance(payload, list):
+        return [c for c in payload if isinstance(c, dict)]
+    if isinstance(payload, dict):
+        for key in ("data", "cars", "results", "items"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                return [c for c in value if isinstance(c, dict)]
+        for value in payload.values():
+            if isinstance(value, list) and value and isinstance(value[0], dict):
+                return value
+    return []

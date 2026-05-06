@@ -1493,6 +1493,11 @@ mcp.mount(
     namespace="demo",
 )
 
+# === Generative UI (LLM-authored Prefab apps, sandboxed in Pyodide) ===
+from fastmcp.apps.generative import GenerativeUI
+
+mcp.add_provider(GenerativeUI(), namespace="generative")
+
 
 @mcp.custom_route("/health", methods=["GET"])
 async def health_check(request):
