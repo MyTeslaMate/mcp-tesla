@@ -1599,11 +1599,24 @@ Workflow:
    the user's car. Pass it via the `data` argument; values become global
    variables in the sandbox.
 
+DO NOT import these — they look like common React names but are NOT
+exported by `prefab_ui.components`. Importing them raises ImportError
+and the call fails:
+  Text         (use Markdown for prose, Heading for titles)
+  Spacer       (use Div(css_class="h-4") or omit — Column/Grid have gap=)
+  Note         (use Alert with variant="info" or AlertDescription)
+  Hr, Divider  (use Separator)
+  Box          (use Div or Container)
+  Stack        (use Column for vertical, Row for horizontal)
+  Flex         (use Row)
+  Row, Col(umn) elements like HTML — Row/Column ARE valid components,
+                but there is no `Col`. Use Column for vertical flex.
+
 Required-field cheatsheet (forgetting these raises Pydantic "missing"):
-  Heading(content), Text(content=), Badge(label=), Metric(label=, value=),
-  Progress(value=, max=), DataTableColumn(key=, header=),
-  DataTable(columns=, rows=), BarChart(data=, series=, x_axis=),
-  ChartSeries(data_key=).
+  Heading(content=), Markdown(content=), Badge(label=),
+  Metric(label=, value=), Progress(value=, max=),
+  DataTableColumn(key=, header=), DataTable(columns=, rows=),
+  BarChart(data=, series=, x_axis=), ChartSeries(data_key=).
 """.strip()
 
 
