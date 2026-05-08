@@ -30,6 +30,37 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("tesla_mcp")
 
 
+# Patch FastMCP's PrefabApp serialiser so the JSON also lands in `content[0].text`,
+# not only in `structuredContent`. Native MCP integrations (Anthropic
+# `mcp_servers`, OpenAI `tools[type=mcp]`) only surface the `content` array
+# to API consumers — they drop `structuredContent`. Without this, our chat
+# backend receives the literal placeholder "[Rendered Prefab UI]" and the
+# Prefab iframe can't mount. Apps SDK clients (ChatGPT/Claude.ai) read
+# `structuredContent` directly and are unaffected.
+def _patch_prefab_tool_result_to_inline_json() -> None:
+    import json
+    from fastmcp.tools import base as _fastmcp_base
+    from mcp.types import TextContent as _TextContent
+
+    original = _fastmcp_base._prefab_to_tool_result
+
+    def _patched(app, fastmcp_app_name=None):
+        result = original(app, fastmcp_app_name=fastmcp_app_name)
+        structured = getattr(result, "structured_content", None)
+        if structured is not None:
+            try:
+                payload = json.dumps(structured, ensure_ascii=False, separators=(",", ":"))
+            except (TypeError, ValueError):
+                return result
+            result.content = [_TextContent(type="text", text=payload)]
+        return result
+
+    _fastmcp_base._prefab_to_tool_result = _patched
+
+
+_patch_prefab_tool_result_to_inline_json()
+
+
 def _normalize_origin(url: str | None) -> str | None:
     """Return normalized https origin from a URL-like value."""
     if not url:
