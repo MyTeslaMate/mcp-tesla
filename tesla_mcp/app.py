@@ -1615,8 +1615,30 @@ and the call fails:
 Required-field cheatsheet (forgetting these raises Pydantic "missing"):
   Heading(content=), Markdown(content=), Badge(label=),
   Metric(label=, value=), Progress(value=, max=),
-  DataTableColumn(key=, header=), DataTable(columns=, rows=),
-  BarChart(data=, series=, x_axis=), ChartSeries(data_key=).
+  DataTableColumn(key=, header=), DataTable(columns=, rows=).
+
+Exact chart signatures — the sandbox truncates Pydantic errors to a URL,
+so getting these wrong leaves you blind. Do NOT improvise:
+
+  ChartSeries(data_key="col", label="Drives", color="#3b82f6")
+    # `data_key` is the column name (str). The legend label is `label`,
+    # NOT `name`. `color` is optional.
+
+  BarChart(data=rows, series=[ChartSeries(...)], x_axis="col",
+           height=320, stacked=False, show_legend=True)
+    # `x_axis` is a STRING — the column name. NEVER pass a dict.
+    # `data` is a list[dict].
+
+  LineChart / Histogram / PieChart: same `x_axis: str` rule as BarChart.
+
+  Grid(columns=3, gap=4, children=[...])
+    # `gap` is an INT (Tailwind spacing scale, 0–8). NOT "m"/"sm"/"lg".
+
+  GridItem(col_span=2, row_span=1, children=[...])
+    # All ints; defaults to 1×1.
+
+If a component you need is not in this cheatsheet, call
+`generative_search_prefab_components` BEFORE writing the code — never guess.
 """.strip()
 
 
