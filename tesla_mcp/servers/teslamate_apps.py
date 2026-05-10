@@ -404,6 +404,79 @@ def build_teslamate_apps_server(
             ],
         )
 
+    @tesla_tool(read_only=True, destructive=False, open_world=True, tags=_TM_TAGS, app=True)
+    def drives_summary_chart(
+        car_id: int,
+        ctx: Context,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        limit: Optional[int] = _DEFAULT_CHART_LIMIT,
+    ) -> PrefabApp:
+        """Render a bar chart of drives per day + headline totals.
+
+        Use this for "show me drives chart / drives per day / driving summary"
+        requests instead of generating Prefab UI ad-hoc — same shape as
+        `charges_summary_chart`, server-side aggregation keeps latency low.
+
+        Args:
+            car_id: The TeslaMate car ID
+            start_date: Optional RFC3339 start date
+            end_date: Optional RFC3339 end date
+            limit: Max recent drives to consider (default 30, sliced before
+                day-bucketing so old days drop off at the period edge).
+        """
+        payload = execute(
+            teslamate_module.get_car_drives,
+            car_id=car_id,
+            start_date=start_date,
+            end_date=end_date,
+            **teslamate_auth_kwargs(ctx),
+        )
+        records = _extract_list(payload, ("data", "drives"), ("drives",))[: (limit or _DEFAULT_CHART_LIMIT)]
+        if not records:
+            return _empty_app(
+                f"Car #{car_id} – Drives summary",
+                "No drives in this period.",
+            )
+
+        # Bucket drives by ISO date (YYYY-MM-DD), summing distance and count.
+        # Track first/last seen date so we can stitch zero-days for empty
+        # gaps in the chart range.
+        per_day: dict[str, dict[str, float]] = {}
+        total_km = 0.0
+        for r in records:
+            if not isinstance(r, dict):
+                continue
+            day = (r.get("start_date") or "")[:10]
+            if not day:
+                continue
+            distance = _coerce_float(_unwrap(r, "odometer_details", "odometer_distance")) or 0.0
+            bucket = per_day.setdefault(day, {"count": 0, "km": 0.0})
+            bucket["count"] += 1
+            bucket["km"] += distance
+            total_km += distance
+
+        chart_rows = [
+            {"date": day, "drives": int(per_day[day]["count"]), "km": round(per_day[day]["km"], 1)}
+            for day in sorted(per_day.keys())
+        ]
+        peak = max(per_day.values(), key=lambda b: b["count"], default={"count": 0})
+
+        title = f"Car #{car_id} – Drives summary"
+        with Column(gap=4) as view:
+            Heading(title, level=2)
+            with Row(gap=4):
+                Metric(label="Drives", value=len(records))
+                Metric(label="Active days", value=len(per_day))
+                Metric(label="Total km", value=round(total_km, 1))
+                Metric(label="Peak/day", value=int(peak["count"]))
+            BarChart(
+                data=chart_rows,
+                series=[ChartSeries(data_key="drives", label="Drives")],
+                x_axis="date",
+            )
+        return PrefabApp(title=title, view=view)
+
     # === Dashboard ===
 
     @tesla_tool(read_only=True, destructive=False, open_world=True, tags=_TM_TAGS, app=True)
