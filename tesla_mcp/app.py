@@ -1608,15 +1608,42 @@ Workflow:
    There is NO `data` variable in the sandbox. Writing `for d in data:`
    raises `NameError: name 'data' is not defined` and the call fails.
 
-IMPORTANT — Data references (latency optimisation):
-When a previous tool response in the conversation ends with a line like
-`[data_ref=mtm:abc123]`, DO NOT copy the JSON payload back into `data`.
-Instead, pass the reference: `data={"__ref__": "mtm:abc123"}`. The server
-resolves it and injects the original payload as globals in the sandbox
-exactly as if you had pasted the JSON. This is dramatically faster — use
-it whenever the data you'd otherwise pass came from a recent tool call.
-The ref expires after a few minutes; if resolution fails, fall back to
-passing the dict inline.
+MANDATORY — Data references (this is the #1 performance rule):
+
+Before writing any Python, scan the recent tool responses in this
+conversation for `[data_ref=mtm:...]` banners. If you find one whose payload
+you would otherwise paste into `data=` or inline inside the script, you MUST
+pass it as a reference. Re-emitting the same JSON you just received is
+NEVER an acceptable shortcut — it can blow the model's output budget by
+50× and triggers a 30–60 s latency spike for the user.
+
+Two shapes accepted:
+
+  Single source — when one tool gave you everything you need:
+      data={"__ref__": "mtm:abc123"}
+    The resolved value's keys become sandbox globals (the `{"data": {...}}`
+    envelope is stripped automatically).
+
+  Multiple sources — when you combine outputs of several tools:
+      data={
+          "drives": "mtm:abc123",      # from teslamate_get_car_drives
+          "charges": "mtm:def456",     # from teslamate_get_car_charges
+          "window_days": 7,            # plain values pass through
+      }
+    Each top-level value that looks like `mtm:...` is resolved server-side;
+    everything else is forwarded unchanged. The KEY (`drives`, `charges`)
+    becomes the sandbox global — same as if you had passed the data inline.
+
+Anti-patterns that make the call hit the slow path:
+  ✗ Pasting the JSON drives array into the code as a literal.
+  ✗ Pasting it into `data={"drives": [{...}, {...}, ...]}` instead of using
+    the ref.
+  ✗ Calling a `teslamate_get_*` tool again to re-fetch data you already
+    received this turn (the ref is still in cache).
+
+Refs are session-scoped and expire after ~5 minutes. If a ref is missing
+the call fails with a clear error telling you to re-fetch — handle that
+gracefully by re-calling the source tool, then retrying with the new ref.
 
 DO NOT import these — they look like common React names but are NOT
 exported by `prefab_ui.components`. Importing them raises ImportError
@@ -1834,6 +1861,28 @@ def _data_ref_session_key(context: MiddlewareContext) -> str | None:
     return None
 
 
+# Sentinel that says "leave args['data'] untouched" — distinguishes from
+# `None` (which is a legitimate resolved value when the model passed nothing).
+_UNCHANGED: object = object()
+
+
+def _unwrap_data_envelope(value: object) -> object:
+    """Strip the `{"data": X}` outer envelope that FastMCP wraps around dict
+    tool results. Without this, a ref resolved from `teslamate_get_car_drives`
+    would inject a `data` global that wraps `{"car": ..., "drives": [...]}` —
+    forcing the model to remember an extra unwrap step. With this, the global
+    structure matches what you'd get from inline `data={"drives": [...]}`.
+    """
+    if (
+        isinstance(value, dict)
+        and len(value) == 1
+        and "data" in value
+        and isinstance(value["data"], dict)
+    ):
+        return value["data"]
+    return value
+
+
 def _extract_data_ref(data: object) -> str | None:
     if isinstance(data, str) and data.startswith(_DATA_REF_PREFIX):
         return data
@@ -1865,6 +1914,71 @@ class DataRefMiddleware(Middleware):
     }
     _BANNER_PREFIX = "[data_ref="
 
+    def _resolve_data_refs(
+        self,
+        data: object,
+        session_key: str | None,
+    ) -> tuple[object, list[str]]:
+        """Resolve any data_ref(s) embedded in the `data` argument.
+
+        Three shapes accepted from the model:
+          1. data="mtm:abc"                 → resolve, replace whole `data`
+          2. data={"__ref__": "mtm:abc"}    → same as (1)
+          3. data={"drives": "mtm:abc", "charges": "mtm:def", "metadata": {...}}
+             → per-key resolution: each value that looks like a ref gets
+               replaced with the cached payload; other values pass through.
+
+        Returns `(resolved, missing_refs)`. `resolved` is `_UNCHANGED` when no
+        refs were present (caller should leave the arg as-is). When any ref
+        is missing/expired, `missing_refs` is populated and the caller should
+        surface an `isError` result instead of running the tool.
+        """
+        # Shape (1) and (2): whole-data ref.
+        whole_ref = _extract_data_ref(data)
+        if whole_ref:
+            cached = _data_ref_cache.get(session_key, whole_ref) if session_key else None
+            if cached is None:
+                return _UNCHANGED, [whole_ref]
+            try:
+                parsed = _json.loads(cached)
+            except (TypeError, ValueError):
+                logger.info("[data_ref] resolved %s as raw text (%d chars)", whole_ref, len(cached))
+                return cached, []
+            parsed = _unwrap_data_envelope(parsed)
+            logger.info("[data_ref] resolved %s (%d chars)", whole_ref, len(cached))
+            return parsed, []
+
+        # Shape (3): per-key refs in a dict.
+        if isinstance(data, dict):
+            missing: list[str] = []
+            resolved_dict: dict[str, object] = {}
+            changed = False
+            for key, value in data.items():
+                if isinstance(value, str) and value.startswith(_DATA_REF_PREFIX):
+                    changed = True
+                    cached = _data_ref_cache.get(session_key, value) if session_key else None
+                    if cached is None:
+                        missing.append(value)
+                        continue
+                    try:
+                        parsed = _json.loads(cached)
+                    except (TypeError, ValueError):
+                        resolved_dict[key] = cached
+                    else:
+                        resolved_dict[key] = _unwrap_data_envelope(parsed)
+                    logger.info(
+                        "[data_ref] resolved %s into key '%s' (%d chars)",
+                        value, key, len(cached),
+                    )
+                else:
+                    resolved_dict[key] = value
+            if missing:
+                return _UNCHANGED, missing
+            if changed:
+                return resolved_dict, []
+
+        return _UNCHANGED, []
+
     @staticmethod
     def _is_ui_render_tool(name: str | None) -> bool:
         """UI-rendering tools already return a PrefabApp tree — their output
@@ -1888,32 +2002,28 @@ class DataRefMiddleware(Middleware):
         if tool_name == "generative_generate_prefab_ui":
             args = getattr(context.message, "arguments", None)
             if isinstance(args, dict):
-                ref = _extract_data_ref(args.get("data"))
-                if ref:
-                    cached = _data_ref_cache.get(session_key, ref) if session_key else None
-                    if cached is not None:
-                        try:
-                            args["data"] = _json.loads(cached)
-                        except (TypeError, ValueError):
-                            args["data"] = cached
-                        logger.info("[data_ref] resolved %s (%d chars)", ref, len(cached))
-                    else:
-                        # Surface the miss as a tool error so the LLM can
-                        # re-fetch and pass inline data instead of silently
-                        # rendering an empty chart from data=None.
-                        logger.warning("[data_ref] miss for %s — returning isError", ref)
-                        return _DataRefCallToolResult(
-                            content=[_DataRefTextContent(
-                                type="text",
-                                text=(
-                                    f"data_ref {ref} expired or not found. "
-                                    "Re-fetch the source data with the original "
-                                    "tool, then call generative_generate_prefab_ui "
-                                    "again passing the data inline (data={...})."
-                                ),
-                            )],
-                            isError=True,
-                        )
+                resolved, missing = self._resolve_data_refs(
+                    args.get("data"), session_key,
+                )
+                if missing:
+                    logger.warning(
+                        "[data_ref] miss for %s — returning isError",
+                        missing,
+                    )
+                    return _DataRefCallToolResult(
+                        content=[_DataRefTextContent(
+                            type="text",
+                            text=(
+                                f"data_ref(s) expired or not found: {missing}. "
+                                "Re-fetch the source data with the original tool, "
+                                "then call generative_generate_prefab_ui again "
+                                "passing the data inline (data={...})."
+                            ),
+                        )],
+                        isError=True,
+                    )
+                if resolved is not _UNCHANGED:
+                    args["data"] = resolved
 
         result = await call_next(context)
 
