@@ -1672,6 +1672,14 @@ Required-field cheatsheet (forgetting these raises Pydantic "missing"):
   Metric(label=, value=), Progress(value=, max=),
   DataTableColumn(key=, header=), DataTable(columns=, rows=).
 
+Chart components — IMPORT FROM A DIFFERENT SUBMODULE:
+  from prefab_ui.components.charts import BarChart, LineChart, PieChart, Histogram, ChartSeries
+
+The following WILL ImportError (charts are NOT re-exported from the main
+components module):
+  from prefab_ui.components import LineChart       # ✗ ImportError
+  from prefab_ui.components import BarChart, ...   # ✗ ImportError
+
 Exact chart signatures — the sandbox truncates Pydantic errors to a URL,
 so getting these wrong leaves you blind. Do NOT improvise:
 
