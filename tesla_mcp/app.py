@@ -1596,8 +1596,17 @@ Workflow:
    `navigation`, `forms`, or `layout` submodule.
 3. Always wrap the tree in `with PrefabApp() as app:` (enables streaming).
 4. Pull data from `teslamate_get_*` tools first if the request is about
-   the user's car. Pass it via the `data` argument; values become global
-   variables in the sandbox.
+   the user's car. Pass it via the `data` argument; each KEY of `data`
+   becomes a top-level global in the sandbox — NOT a single `data` variable.
+
+   Example: you call with `data={"drives": [...], "car": {...}}`. In the
+   sandbox you access them as `drives` and `car` directly:
+
+       drives = globals().get("drives", [])
+       car = globals().get("car", {})
+
+   There is NO `data` variable in the sandbox. Writing `for d in data:`
+   raises `NameError: name 'data' is not defined` and the call fails.
 
 IMPORTANT — Data references (latency optimisation):
 When a previous tool response in the conversation ends with a line like
@@ -1746,6 +1755,7 @@ import uuid as _uuid
 from collections import OrderedDict as _OrderedDict
 from threading import Lock as _Lock
 
+from mcp.types import CallToolResult as _DataRefCallToolResult
 from mcp.types import TextContent as _DataRefTextContent
 
 _DATA_REF_PREFIX = "mtm:"
@@ -1841,16 +1851,34 @@ class DataRefMiddleware(Middleware):
       (or `data="mtm:..."`), look up the cached payload and substitute it as
       the real `data` dict before forwarding. The LLM never has to re-emit
       the JSON.
-    - Post-call: for any non-generative tool, store the textual result and
-      append a discreet `[data_ref=mtm:...]` line so the LLM sees a handle
-      it can pass to a later generative call.
+    - Post-call: for any data tool (non-generative AND non-UI-render), store
+      the textual result and append a separate `[data_ref=mtm:...]` content
+      block so the LLM sees a handle it can pass to a later generative call.
+      The banner is a NEW content block — `content[0].text` is left intact so
+      backend clients can still `json_decode` it (most data tools return JSON
+      via FastMCP's standard serializer).
     """
 
     _GENERATIVE_TOOLS = {
         "generative_generate_prefab_ui",
         "generative_search_prefab_components",
     }
-    _BANNER_PREFIX = "\n[data_ref="
+    _BANNER_PREFIX = "[data_ref="
+
+    @staticmethod
+    def _is_ui_render_tool(name: str | None) -> bool:
+        """UI-rendering tools already return a PrefabApp tree — their output
+        is consumed for direct mounting, not as data for a subsequent
+        generative call. No banner needed."""
+        if not name:
+            return False
+        if name == "teslamate_dashboard":
+            return True
+        return (
+            name.endswith("_chart")
+            or name.endswith("_table")
+            or name.endswith("_card")
+        )
 
     async def on_call_tool(self, context: MiddlewareContext, call_next):
         tool_name = getattr(context.message, "name", None)
@@ -1870,34 +1898,56 @@ class DataRefMiddleware(Middleware):
                             args["data"] = cached
                         logger.info("[data_ref] resolved %s (%d chars)", ref, len(cached))
                     else:
-                        logger.warning(
-                            "[data_ref] miss for %s — proceeding with data=None",
-                            ref,
+                        # Surface the miss as a tool error so the LLM can
+                        # re-fetch and pass inline data instead of silently
+                        # rendering an empty chart from data=None.
+                        logger.warning("[data_ref] miss for %s — returning isError", ref)
+                        return _DataRefCallToolResult(
+                            content=[_DataRefTextContent(
+                                type="text",
+                                text=(
+                                    f"data_ref {ref} expired or not found. "
+                                    "Re-fetch the source data with the original "
+                                    "tool, then call generative_generate_prefab_ui "
+                                    "again passing the data inline (data={...})."
+                                ),
+                            )],
+                            isError=True,
                         )
-                        args["data"] = None
 
         result = await call_next(context)
 
-        # Post-call: cache non-generative tool results and annotate the banner.
+        # Post-call: cache data-tool results and append a banner content block.
+        # Skip generative tools (they don't produce reusable data) and skip
+        # UI-render tools (their output is a PrefabApp tree the client mounts
+        # directly — banner would only confuse the LLM into re-passing it).
         if (
             tool_name
             and tool_name not in self._GENERATIVE_TOOLS
+            and not self._is_ui_render_tool(tool_name)
             and session_key
         ):
             content = getattr(result, "content", None) or []
             if content:
                 first = content[0]
                 text = getattr(first, "text", None)
+                already_bannered = any(
+                    isinstance(getattr(b, "text", None), str)
+                    and b.text.startswith(self._BANNER_PREFIX)
+                    for b in content
+                )
                 if (
                     isinstance(text, str)
                     and text
                     and len(text) <= _DATA_REF_MAX_PAYLOAD
-                    and self._BANNER_PREFIX not in text
+                    and not already_bannered
                 ):
                     ref = _data_ref_cache.put(session_key, text)
-                    new_text = f"{text}{self._BANNER_PREFIX}{ref}]"
                     new_content = list(content)
-                    new_content[0] = _DataRefTextContent(type="text", text=new_text)
+                    new_content.append(_DataRefTextContent(
+                        type="text",
+                        text=f"{self._BANNER_PREFIX}{ref}]",
+                    ))
                     result.content = new_content
 
         return result
