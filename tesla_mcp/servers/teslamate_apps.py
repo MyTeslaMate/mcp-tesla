@@ -143,7 +143,7 @@ def build_teslamate_apps_server(
 
     # === Current charge ===
 
-    @tesla_tool(read_only=True, destructive=False, open_world=True, tags=_TM_TAGS, app=True)
+    # @tesla_tool(read_only=True, destructive=False, open_world=True, tags=_TM_TAGS, app=True)  # disabled — was a server-rendered Prefab UI tool
     def current_charge_card(car_id: int, ctx: Context) -> PrefabApp:
         """Render a live card for the currently active charging session.
 
@@ -191,7 +191,7 @@ def build_teslamate_apps_server(
 
     # === Battery health (scalar metrics, no timeseries) ===
 
-    @tesla_tool(read_only=True, destructive=False, open_world=True, tags=_TM_TAGS, app=True)
+    # @tesla_tool(read_only=True, destructive=False, open_world=True, tags=_TM_TAGS, app=True)  # disabled — was a server-rendered Prefab UI tool
     def battery_health_chart(car_id: int, ctx: Context) -> PrefabApp:
         """Render battery health KPIs (SoH, capacity, range).
 
@@ -251,7 +251,7 @@ def build_teslamate_apps_server(
 
     # === Charges ===
 
-    @tesla_tool(read_only=True, destructive=False, open_world=True, tags=_TM_TAGS, app=True)
+    # @tesla_tool(read_only=True, destructive=False, open_world=True, tags=_TM_TAGS, app=True)  # disabled — was a server-rendered Prefab UI tool
     def charges_table(
         car_id: int,
         ctx: Context,
@@ -291,7 +291,7 @@ def build_teslamate_apps_server(
             ],
         )
 
-    @tesla_tool(read_only=True, destructive=False, open_world=True, tags=_TM_TAGS, app=True)
+    # @tesla_tool(read_only=True, destructive=False, open_world=True, tags=_TM_TAGS, app=True)  # disabled — was a server-rendered Prefab UI tool
     def charges_summary_chart(
         car_id: int,
         ctx: Context,
@@ -357,7 +357,7 @@ def build_teslamate_apps_server(
 
     # === Drives ===
 
-    @tesla_tool(read_only=True, destructive=False, open_world=True, tags=_TM_TAGS, app=True)
+    # @tesla_tool(read_only=True, destructive=False, open_world=True, tags=_TM_TAGS, app=True)  # disabled — was a server-rendered Prefab UI tool
     def drives_table(
         car_id: int,
         ctx: Context,
@@ -404,7 +404,7 @@ def build_teslamate_apps_server(
             ],
         )
 
-    @tesla_tool(read_only=True, destructive=False, open_world=True, tags=_TM_TAGS, app=True)
+    # @tesla_tool(read_only=True, destructive=False, open_world=True, tags=_TM_TAGS, app=True)  # disabled — was a server-rendered Prefab UI tool
     def drives_summary_chart(
         car_id: int,
         ctx: Context,
@@ -479,7 +479,7 @@ def build_teslamate_apps_server(
 
     # === Dashboard ===
 
-    @tesla_tool(read_only=True, destructive=False, open_world=True, tags=_TM_TAGS, app=True)
+    # @tesla_tool(read_only=True, destructive=False, open_world=True, tags=_TM_TAGS, app=True)  # disabled — was a server-rendered Prefab UI tool
     def dashboard(car_id: int, ctx: Context) -> PrefabApp:
         """Combined teslamate dashboard: status + battery + recent charges + drives.
 
