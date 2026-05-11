@@ -1617,22 +1617,31 @@ pass it as a reference. Re-emitting the same JSON you just received is
 NEVER an acceptable shortcut — it can blow the model's output budget by
 50× and triggers a 30–60 s latency spike for the user.
 
-Two shapes accepted:
+Two shapes accepted — pick based on how many sources you combine:
 
-  Single source — when one tool gave you everything you need:
-      data={"__ref__": "mtm:abc123"}
-    The resolved value's keys become sandbox globals (the `{"data": {...}}`
-    envelope is stripped automatically).
+  Single source — PREFERRED when one `teslamate_get_*` gave everything:
+      data={"__ref__": "mtm:abc123"}    # or just data="mtm:abc123"
+    The resolved value is flattened: each key of the tool's inner result
+    (e.g. `car`, `drives`, `units` from `teslamate_get_car_drives`)
+    becomes its own global. Then in Python you write directly:
+        drives = globals().get("drives", [])
+        car = globals().get("car", {})
 
-  Multiple sources — when you combine outputs of several tools:
+  Multiple sources — only when you genuinely merge outputs of several tools:
       data={
-          "drives": "mtm:abc123",      # from teslamate_get_car_drives
-          "charges": "mtm:def456",     # from teslamate_get_car_charges
-          "window_days": 7,            # plain values pass through
+          "drives": "mtm:abc123",       # from teslamate_get_car_drives
+          "charges": "mtm:def456",      # from teslamate_get_car_charges
+          "window_days": 7,             # plain values pass through
       }
-    Each top-level value that looks like `mtm:...` is resolved server-side;
-    everything else is forwarded unchanged. The KEY (`drives`, `charges`)
-    becomes the sandbox global — same as if you had passed the data inline.
+    The KEY (`drives`, `charges`) becomes the sandbox global. The server
+    is smart about the value: if the resolved payload contains a top-level
+    key matching the parent (e.g. parent `drives` and resolved has a
+    `drives` field), it drills in — so `drives` global IS the drives list,
+    not the wrapping dict. Other plain values pass through unchanged.
+
+If you only need ONE tool's data, always pick single-source — it's the
+cleanest mapping and the model has the smallest chance of structural
+mistakes. Reserve multi-source for true cross-tool combination.
 
 Anti-patterns that make the call hit the slow path:
   ✗ Pasting the JSON drives array into the code as a literal.
@@ -1883,6 +1892,22 @@ def _unwrap_data_envelope(value: object) -> object:
     return value
 
 
+def _smart_extract_by_key(parent_key: str, value: object) -> object:
+    """In multi-ref form `data={"drives": "mtm:..."}` the model's intent is
+    almost always "the global named `drives` should be the drives list".
+    But the cached payload of a `teslamate_get_*` tool is an inner dict like
+    `{"car": {...}, "drives": [...], "units": {...}}`. If the parent key
+    (`drives`) matches a key in that dict, drill into it so the global
+    ends up as the value the model expected.
+
+    Bypassed when the parent key doesn't match — the model gets the full
+    structure to navigate manually.
+    """
+    if isinstance(value, dict) and parent_key in value:
+        return value[parent_key]
+    return value
+
+
 def _extract_data_ref(data: object) -> str | None:
     if isinstance(data, str) and data.startswith(_DATA_REF_PREFIX):
         return data
@@ -1965,7 +1990,17 @@ class DataRefMiddleware(Middleware):
                     except (TypeError, ValueError):
                         resolved_dict[key] = cached
                     else:
-                        resolved_dict[key] = _unwrap_data_envelope(parsed)
+                        # Two-step normalisation so multi-ref maps cleanly
+                        # onto the model's intent:
+                        #   1. Strip the `{"data": X}` FastMCP envelope.
+                        #   2. If the parent key matches a key inside the
+                        #      inner dict (e.g. parent "drives" + inner
+                        #      `{"car":..,"drives":[...],"units":..}`),
+                        #      drill into it. Result: `drives` global is
+                        #      the actual drives list.
+                        parsed = _unwrap_data_envelope(parsed)
+                        parsed = _smart_extract_by_key(key, parsed)
+                        resolved_dict[key] = parsed
                     logger.info(
                         "[data_ref] resolved %s into key '%s' (%d chars)",
                         value, key, len(cached),
