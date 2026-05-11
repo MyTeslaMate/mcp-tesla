@@ -1599,6 +1599,16 @@ Workflow:
    the user's car. Pass it via the `data` argument; values become global
    variables in the sandbox.
 
+IMPORTANT — Data references (latency optimisation):
+When a previous tool response in the conversation ends with a line like
+`[data_ref=mtm:abc123]`, DO NOT copy the JSON payload back into `data`.
+Instead, pass the reference: `data={"__ref__": "mtm:abc123"}`. The server
+resolves it and injects the original payload as globals in the sandbox
+exactly as if you had pasted the JSON. This is dramatically faster — use
+it whenever the data you'd otherwise pass came from a recent tool call.
+The ref expires after a few minutes; if resolution fails, fall back to
+passing the dict inline.
+
 DO NOT import these — they look like common React names but are NOT
 exported by `prefab_ui.components`. Importing them raises ImportError
 and the call fails:
@@ -1723,6 +1733,177 @@ class GenerativeLoggingMiddleware(Middleware):
 
 
 mcp.add_middleware(GenerativeLoggingMiddleware())
+
+
+# === Data reference cache: avoid the LLM re-emitting tool JSON when calling
+# `generative_generate_prefab_ui`. Each non-generative tool result is cached
+# server-side under a short opaque ref; the response is annotated with a
+# `[data_ref=mtm:...]` banner so the LLM can pass `data={"__ref__": "..."}`
+# back in the generative call instead of copying the full payload.
+import json as _json
+import time as _time
+import uuid as _uuid
+from collections import OrderedDict as _OrderedDict
+from threading import Lock as _Lock
+
+from mcp.types import TextContent as _DataRefTextContent
+
+_DATA_REF_PREFIX = "mtm:"
+_DATA_REF_TTL = int(os.environ.get("GENERATIVE_DATA_REF_TTL", "300"))
+_DATA_REF_MAXSIZE = int(os.environ.get("GENERATIVE_DATA_REF_MAXSIZE", "512"))
+_DATA_REF_MAX_PAYLOAD = int(os.environ.get("GENERATIVE_DATA_REF_MAX_PAYLOAD", "200000"))
+
+
+class _DataRefCache:
+    """Tiny TTL+LRU cache for tool result payloads, scoped per session key."""
+
+    def __init__(self, maxsize: int, ttl: int) -> None:
+        self._maxsize = maxsize
+        self._ttl = ttl
+        self._store: "_OrderedDict[tuple[str, str], tuple[float, str]]" = _OrderedDict()
+        self._lock = _Lock()
+
+    def _purge_locked(self, now: float) -> None:
+        # Evict expired entries (cheap walk; small N).
+        expired = [k for k, (ts, _) in self._store.items() if now - ts > self._ttl]
+        for k in expired:
+            self._store.pop(k, None)
+
+    def put(self, session_key: str, payload: str) -> str:
+        ref_id = _uuid.uuid4().hex[:12]
+        now = _time.monotonic()
+        with self._lock:
+            self._purge_locked(now)
+            self._store[(session_key, ref_id)] = (now, payload)
+            while len(self._store) > self._maxsize:
+                self._store.popitem(last=False)
+        return f"{_DATA_REF_PREFIX}{ref_id}"
+
+    def get(self, session_key: str, ref: str) -> str | None:
+        if not ref.startswith(_DATA_REF_PREFIX):
+            return None
+        ref_id = ref[len(_DATA_REF_PREFIX):]
+        now = _time.monotonic()
+        with self._lock:
+            entry = self._store.get((session_key, ref_id))
+            if entry is None:
+                return None
+            ts, payload = entry
+            if now - ts > self._ttl:
+                self._store.pop((session_key, ref_id), None)
+                return None
+            # Touch for LRU recency.
+            self._store.move_to_end((session_key, ref_id))
+            return payload
+
+
+_data_ref_cache = _DataRefCache(maxsize=_DATA_REF_MAXSIZE, ttl=_DATA_REF_TTL)
+
+
+def _data_ref_session_key(context: MiddlewareContext) -> str | None:
+    """Derive a per-user/per-session namespace so refs never leak across users."""
+    try:
+        request = context.fastmcp_context.request_context.request
+    except AttributeError:
+        return None
+    if request is None:
+        return None
+    user = getattr(request, "user", None)
+    if user is not None and hasattr(user, "access_token"):
+        try:
+            sub = user.access_token.claims.get("sub")
+        except AttributeError:
+            sub = None
+        if sub:
+            return f"u:{sub}"
+    headers = getattr(request, "headers", None)
+    if headers is not None:
+        sid = headers.get("mcp-session-id") or headers.get("Mcp-Session-Id")
+        if sid:
+            return f"s:{sid}"
+    return None
+
+
+def _extract_data_ref(data: object) -> str | None:
+    if isinstance(data, str) and data.startswith(_DATA_REF_PREFIX):
+        return data
+    if isinstance(data, dict) and len(data) == 1:
+        v = data.get("__ref__")
+        if isinstance(v, str) and v.startswith(_DATA_REF_PREFIX):
+            return v
+    return None
+
+
+class DataRefMiddleware(Middleware):
+    """Cache non-generative tool outputs + resolve refs for the generative tool.
+
+    - Pre-call: if the generative tool was invoked with `data={"__ref__": "mtm:..."}`
+      (or `data="mtm:..."`), look up the cached payload and substitute it as
+      the real `data` dict before forwarding. The LLM never has to re-emit
+      the JSON.
+    - Post-call: for any non-generative tool, store the textual result and
+      append a discreet `[data_ref=mtm:...]` line so the LLM sees a handle
+      it can pass to a later generative call.
+    """
+
+    _GENERATIVE_TOOLS = {
+        "generative_generate_prefab_ui",
+        "generative_search_prefab_components",
+    }
+    _BANNER_PREFIX = "\n[data_ref="
+
+    async def on_call_tool(self, context: MiddlewareContext, call_next):
+        tool_name = getattr(context.message, "name", None)
+        session_key = _data_ref_session_key(context)
+
+        # Pre-call: resolve any data_ref into the real `data` payload.
+        if tool_name == "generative_generate_prefab_ui":
+            args = getattr(context.message, "arguments", None)
+            if isinstance(args, dict):
+                ref = _extract_data_ref(args.get("data"))
+                if ref:
+                    cached = _data_ref_cache.get(session_key, ref) if session_key else None
+                    if cached is not None:
+                        try:
+                            args["data"] = _json.loads(cached)
+                        except (TypeError, ValueError):
+                            args["data"] = cached
+                        logger.info("[data_ref] resolved %s (%d chars)", ref, len(cached))
+                    else:
+                        logger.warning(
+                            "[data_ref] miss for %s — proceeding with data=None",
+                            ref,
+                        )
+                        args["data"] = None
+
+        result = await call_next(context)
+
+        # Post-call: cache non-generative tool results and annotate the banner.
+        if (
+            tool_name
+            and tool_name not in self._GENERATIVE_TOOLS
+            and session_key
+        ):
+            content = getattr(result, "content", None) or []
+            if content:
+                first = content[0]
+                text = getattr(first, "text", None)
+                if (
+                    isinstance(text, str)
+                    and text
+                    and len(text) <= _DATA_REF_MAX_PAYLOAD
+                    and self._BANNER_PREFIX not in text
+                ):
+                    ref = _data_ref_cache.put(session_key, text)
+                    new_text = f"{text}{self._BANNER_PREFIX}{ref}]"
+                    new_content = list(content)
+                    new_content[0] = _DataRefTextContent(type="text", text=new_text)
+                    result.content = new_content
+
+        return result
+
+
+mcp.add_middleware(DataRefMiddleware())
 
 
 @mcp.custom_route("/health", methods=["GET"])
