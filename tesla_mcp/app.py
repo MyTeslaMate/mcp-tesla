@@ -1595,6 +1595,17 @@ Workflow:
    Everything is flat under `prefab_ui.components` — there is NO
    `navigation`, `forms`, or `layout` submodule.
 3. Always wrap the tree in `with PrefabApp() as app:` (enables streaming).
+   Components self-register when instantiated inside that block. There is
+   NO `app.add(...)` method — calling it raises `AttributeError`. Just
+   write the component statements directly, e.g.:
+
+       with PrefabApp() as app:
+           Heading(content="Title", level=2)        # ✓ auto-registered
+           BarChart(data=rows, x_axis="date", ...)  # ✓ auto-registered
+
+   NOT:
+           app.add(Heading(...))                    # ✗ AttributeError
+           app.children.append(...)                 # ✗ no such attribute
 4. Pull data from `teslamate_get_*` tools first if the request is about
    the user's car. Pass it via the `data` argument; each KEY of `data`
    becomes a top-level global in the sandbox — NOT a single `data` variable.
