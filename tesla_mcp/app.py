@@ -1531,6 +1531,71 @@ _SKILLS_DIR = Path(__file__).parent / "skills"
 if _SKILLS_DIR.is_dir():
     mcp.add_provider(SkillsDirectoryProvider(_SKILLS_DIR))
 
+
+# Also expose each skill as a tool. Anthropic's `mcp_servers` integration
+# (and the OpenAI bridge) only see MCP *tools* — they ignore Resources, so
+# the SkillsDirectoryProvider alone isn't reachable from API clients. Each
+# tool returns the SKILL.md body so the LLM can follow the workflow when
+# the user's intent matches.
+def _register_skill_tools() -> None:
+    import yaml as _yaml
+
+    if not _SKILLS_DIR.is_dir():
+        return
+    for skill_dir in sorted(_SKILLS_DIR.iterdir()):
+        skill_md = skill_dir / "SKILL.md"
+        if not skill_md.is_file():
+            continue
+        try:
+            raw = skill_md.read_text(encoding="utf-8")
+        except OSError as exc:
+            logger.warning("[skills] cannot read %s: %s", skill_md, exc)
+            continue
+        front, _, body = _split_skill_frontmatter(raw)
+        meta = _yaml.safe_load(front) if front else {}
+        if not isinstance(meta, dict):
+            meta = {}
+        name = (meta.get("name") or skill_dir.name).strip()
+        description = (meta.get("description") or "").strip()
+        tool_name = f"skill_{name.replace('-', '_')}"
+        skill_body = body.lstrip("\n")
+
+        # Closure captures the body so each tool returns its own SKILL.md.
+        def _make_handler(text: str):
+            async def _skill_tool() -> str:
+                """Return this skill's workflow markdown for the LLM to follow."""
+                return text
+            return _skill_tool
+
+        handler = _make_handler(skill_body)
+        handler.__name__ = tool_name
+        mcp.tool(
+            name=tool_name,
+            description=description or f"Run the '{name}' skill workflow.",
+            tags={"skill", "teslamate", "generative"},
+            annotations={
+                "readOnlyHint": True,
+                "destructiveHint": False,
+                "openWorldHint": True,
+            },
+        )(handler)
+        logger.info("[skills] registered tool %s", tool_name)
+
+
+def _split_skill_frontmatter(text: str) -> tuple[str, str, str]:
+    """Split `---\\n<yaml>\\n---\\n<body>` into (front, marker, body)."""
+    if not text.startswith("---"):
+        return "", "", text
+    end = text.find("\n---", 3)
+    if end == -1:
+        return "", "", text
+    front = text[3:end].strip()
+    rest = text[end + 4:]
+    return front, "---", rest
+
+
+_register_skill_tools()
+
 # === Generative UI (LLM-authored Prefab apps, sandboxed in Pyodide) ===
 from fastmcp.apps.generative import GenerativeUI
 from fastmcp.server.transforms import ToolTransform
