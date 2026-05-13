@@ -1875,8 +1875,8 @@ import uuid as _uuid
 from collections import OrderedDict as _OrderedDict
 from threading import Lock as _Lock
 
-from mcp.types import CallToolResult as _DataRefCallToolResult
-from mcp.types import TextContent as _DataRefTextContent
+from fastmcp.exceptions import ToolError as _DataRefToolError
+from mcp.types import TextContent as _DataRefTextContent  # noqa: F401
 
 _DATA_REF_PREFIX = "mtm:"
 _DATA_REF_TTL = int(os.environ.get("GENERATIVE_DATA_REF_TTL", "300"))
@@ -2126,20 +2126,14 @@ class DataRefMiddleware(Middleware):
                 )
                 if missing:
                     logger.warning(
-                        "[data_ref] miss for %s — returning isError",
+                        "[data_ref] miss for %s — raising ToolError",
                         missing,
                     )
-                    return _DataRefCallToolResult(
-                        content=[_DataRefTextContent(
-                            type="text",
-                            text=(
-                                f"data_ref(s) expired or not found: {missing}. "
-                                "Re-fetch the source data with the original tool, "
-                                "then call generative_generate_prefab_ui again "
-                                "passing the data inline (data={...})."
-                            ),
-                        )],
-                        isError=True,
+                    raise _DataRefToolError(
+                        f"data_ref(s) expired or not found: {missing}. "
+                        "Re-fetch the source data with the original tool, "
+                        "then call generative_generate_prefab_ui again "
+                        "passing the data inline (data={...})."
                     )
                 if resolved is not _UNCHANGED:
                     args["data"] = resolved
