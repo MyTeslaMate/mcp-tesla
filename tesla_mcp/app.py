@@ -2135,6 +2135,12 @@ class DataRefMiddleware(Middleware):
     async def on_call_tool(self, context: MiddlewareContext, call_next):
         tool_name = getattr(context.message, "name", None)
         session_key = _data_ref_session_key(context)
+        # Diagnostic — emit at INFO so we can confirm the middleware sees
+        # data-fetch tool calls and what session_key was resolved to.
+        logger.info(
+            "[data_ref] middleware on_call_tool: name=%r session_key=%r",
+            tool_name, session_key,
+        )
 
         # Pre-call: resolve any data_ref into the real `data` payload.
         if tool_name == "generative_generate_prefab_ui":
