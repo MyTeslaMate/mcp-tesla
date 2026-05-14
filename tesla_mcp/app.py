@@ -2208,6 +2208,22 @@ class DataRefMiddleware(Middleware):
                         text=f"{self._BANNER_PREFIX}{ref}]",
                     ))
                     result.content = new_content
+                    logger.info(
+                        "[data_ref] put for tool %s → %s (%d chars cached, %d content blocks now)",
+                        tool_name, ref, len(text), len(new_content),
+                    )
+                else:
+                    logger.info(
+                        "[data_ref] put skipped for %s — text_kind=%s len=%d bannered=%s max=%d",
+                        tool_name, type(text).__name__,
+                        len(text) if isinstance(text, str) else -1,
+                        already_bannered, _DATA_REF_MAX_PAYLOAD,
+                    )
+            else:
+                logger.info(
+                    "[data_ref] put skipped for %s — no content blocks",
+                    tool_name,
+                )
 
         return result
 
