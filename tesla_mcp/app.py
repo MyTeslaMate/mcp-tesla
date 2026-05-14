@@ -1693,10 +1693,23 @@ pass it as a reference. Re-emitting the same JSON you just received is
 NEVER an acceptable shortcut — it can blow the model's output budget by
 50× and triggers a 30–60 s latency spike for the user.
 
+Refs use SEMANTIC ids based on the source tool name — copy them
+EXACTLY from the banner you just received. Examples of valid refs you
+will see in banners:
+    mtm:get_car_drives     (from teslamate_get_car_drives)
+    mtm:get_car_charges    (from teslamate_get_car_charges)
+    mtm:get_cars           (from teslamate_get_cars)
+    mtm:get_car_status     (from teslamate_get_car_status)
+
+DO NOT invent refs (`mtm:abc123`, `mtm:<random hex>`, `mtm:<uuid>`)
+— those are not in the cache and the call will fail with
+"data_ref not found". The ref ID is ALWAYS the bare tool name
+with the `teslamate_` prefix stripped.
+
 Two shapes accepted — pick based on how many sources you combine:
 
   Single source — PREFERRED when one `teslamate_get_*` gave everything:
-      data={"__ref__": "mtm:abc123"}    # or just data="mtm:abc123"
+      data={"__ref__": "mtm:get_car_drives"}    # or just data="mtm:get_car_drives"
     The resolved value is flattened: each key of the tool's inner result
     (e.g. `car`, `drives`, `units` from `teslamate_get_car_drives`)
     becomes its own global. Then in Python you write directly:
@@ -1705,9 +1718,9 @@ Two shapes accepted — pick based on how many sources you combine:
 
   Multiple sources — only when you genuinely merge outputs of several tools:
       data={
-          "drives": "mtm:abc123",       # from teslamate_get_car_drives
-          "charges": "mtm:def456",      # from teslamate_get_car_charges
-          "window_days": 7,             # plain values pass through
+          "drives": "mtm:get_car_drives",       # from teslamate_get_car_drives
+          "charges": "mtm:get_car_charges",     # from teslamate_get_car_charges
+          "window_days": 7,                     # plain values pass through
       }
     The KEY (`drives`, `charges`) becomes the sandbox global. The server
     is smart about the value: if the resolved payload contains a top-level
@@ -1899,11 +1912,21 @@ class _DataRefCache:
         for k in expired:
             self._store.pop(k, None)
 
-    def put(self, session_key: str, payload: str) -> str:
-        ref_id = _uuid.uuid4().hex[:12]
+    def put(self, session_key: str, payload: str, ref_id: str | None = None) -> str:
+        """Cache `payload` under (session_key, ref_id) and return the full
+        `mtm:<ref_id>` handle. When `ref_id` is None, falls back to a
+        random 12-char hex — used for tools we don't have a semantic name
+        for. Semantic IDs (e.g. ref_id="drives") let the LLM copy short
+        readable words instead of random hex, which it routinely hallucinates.
+        """
+        if not ref_id:
+            ref_id = _uuid.uuid4().hex[:12]
         now = _time.monotonic()
         with self._lock:
             self._purge_locked(now)
+            # Move to end (LRU touch) — handles the overwrite case for
+            # semantic IDs cleanly.
+            self._store.pop((session_key, ref_id), None)
             self._store[(session_key, ref_id)] = (now, payload)
             while len(self._store) > self._maxsize:
                 self._store.popitem(last=False)
@@ -2118,6 +2141,23 @@ class DataRefMiddleware(Middleware):
         return _UNCHANGED, []
 
     @staticmethod
+    def _semantic_ref_id(tool_name: str) -> str:
+        """Map a tool name to a short, memorable cache key that the LLM
+        can copy reliably. Strips known prefixes and namespace separators.
+        Example: 'teslamate.get_car_drives' → 'get_car_drives'.
+        """
+        n = tool_name or ""
+        # Drop the namespace prefix added by `mcp.mount(..., namespace=...)`.
+        for sep in (".", "/", ":"):
+            if sep in n:
+                n = n.split(sep, 1)[1]
+        # Drop the conventional `teslamate_` prefix for brevity.
+        if n.startswith("teslamate_"):
+            n = n[len("teslamate_"):]
+        # Defensive: keep only chars the LLM can copy without confusion.
+        return "".join(c for c in n if c.isalnum() or c == "_") or "data"
+
+    @staticmethod
     def _is_ui_render_tool(name: str | None) -> bool:
         """UI-rendering tools already return a PrefabApp tree — their output
         is consumed for direct mounting, not as data for a subsequent
@@ -2201,7 +2241,11 @@ class DataRefMiddleware(Middleware):
                     and len(text) <= _DATA_REF_MAX_PAYLOAD
                     and not already_bannered
                 ):
-                    ref = _data_ref_cache.put(session_key, text)
+                    # Use a semantic ref ID derived from the tool name —
+                    # LLMs reliably copy short readable strings, they
+                    # routinely hallucinate long random hex.
+                    semantic_id = self._semantic_ref_id(tool_name)
+                    ref = _data_ref_cache.put(session_key, text, ref_id=semantic_id)
                     new_content = list(content)
                     new_content.append(_DataRefTextContent(
                         type="text",
