@@ -1931,26 +1931,45 @@ _data_ref_cache = _DataRefCache(maxsize=_DATA_REF_MAXSIZE, ttl=_DATA_REF_TTL)
 
 
 def _data_ref_session_key(context: MiddlewareContext) -> str | None:
-    """Derive a per-user/per-session namespace so refs never leak across users."""
+    """Derive a per-user/per-session namespace so refs never leak across users.
+
+    Tries in order:
+      1. `access_token.claims.sub` — preferred if the verifier sets it
+      2. `access_token.client_id` — second-best stable per-user id
+      3. `mtm_token` claim — what TeslaTokenVerifier stores (per-user)
+      4. `mcp-session-id` header — per-transport session
+      5. Authorization header hash — last-resort per-bearer fallback
+    Returning `None` here disables ref caching for the request entirely.
+    """
+    import hashlib as _hashlib
+
     try:
         request = context.fastmcp_context.request_context.request
     except AttributeError:
         return None
     if request is None:
         return None
+
     user = getattr(request, "user", None)
-    if user is not None and hasattr(user, "access_token"):
-        try:
-            sub = user.access_token.claims.get("sub")
-        except AttributeError:
-            sub = None
-        if sub:
-            return f"u:{sub}"
+    token = getattr(user, "access_token", None) if user is not None else None
+    if token is not None:
+        claims = getattr(token, "claims", None) or {}
+        for key in ("sub", "mtm_token"):
+            val = claims.get(key) if hasattr(claims, "get") else None
+            if val:
+                return f"u:{key}:{_hashlib.sha1(str(val).encode()).hexdigest()[:16]}"
+        client_id = getattr(token, "client_id", None)
+        if client_id and client_id != "cached":
+            return f"c:{client_id}"
+
     headers = getattr(request, "headers", None)
     if headers is not None:
         sid = headers.get("mcp-session-id") or headers.get("Mcp-Session-Id")
         if sid:
             return f"s:{sid}"
+        auth = headers.get("authorization") or headers.get("Authorization")
+        if auth:
+            return f"a:{_hashlib.sha1(auth.encode()).hexdigest()[:16]}"
     return None
 
 
@@ -2144,6 +2163,17 @@ class DataRefMiddleware(Middleware):
         # Skip generative tools (they don't produce reusable data) and skip
         # UI-render tools (their output is a PrefabApp tree the client mounts
         # directly — banner would only confuse the LLM into re-passing it).
+        if (
+            tool_name
+            and tool_name not in self._GENERATIVE_TOOLS
+            and not self._is_ui_render_tool(tool_name)
+            and not session_key
+        ):
+            logger.warning(
+                "[data_ref] no session_key for tool %s — banner skipped, "
+                "LLM will likely hallucinate refs",
+                tool_name,
+            )
         if (
             tool_name
             and tool_name not in self._GENERATIVE_TOOLS
