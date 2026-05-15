@@ -81,6 +81,8 @@ class TeslaMateAPIModule(TeslaModule):
         auth_type: str = "bearer",
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        page: int = 1,
+        show: int = 100,
     ) -> Dict[str, Any]:
         """
         Get charging sessions for a specific car.
@@ -89,12 +91,15 @@ class TeslaMateAPIModule(TeslaModule):
             car_id: The TeslaMate car ID
             start_date: Optional start date in RFC3339 format (e.g., 2006-01-02T15:04:05Z)
             end_date: Optional end date in RFC3339 format (e.g., 2006-01-02T15:04:05Z)
+            page: TeslaMate pagination — which page to fetch (default 1).
+            show: TeslaMate pagination — entries per page (default 100, max
+                enforced server-side).
 
         Returns:
             List of charging sessions
         """
         context = self._get_teslamate_context(bearer_token, endpoint, auth_type)
-        params: Dict[str, Any] = {}
+        params: Dict[str, Any] = {"page": page, "show": show}
         if start_date:
             params["startDate"] = start_date
         if end_date:
@@ -155,6 +160,8 @@ class TeslaMateAPIModule(TeslaModule):
         end_date: Optional[str] = None,
         min_distance: Optional[float] = None,
         max_distance: Optional[float] = None,
+        page: int = 1,
+        show: int = 100,
     ) -> Dict[str, Any]:
         """
         Get driving sessions for a specific car.
@@ -165,12 +172,15 @@ class TeslaMateAPIModule(TeslaModule):
             end_date: Optional end date in RFC3339 format (e.g., 2006-01-02T15:04:05Z)
             min_distance: Optional minimum trip distance (units based on TeslaMate settings)
             max_distance: Optional maximum trip distance (units based on TeslaMate settings)
+            page: TeslaMate pagination — which page to fetch (default 1).
+            show: TeslaMate pagination — entries per page (default 100, max
+                enforced server-side).
 
         Returns:
             List of driving sessions
         """
         context = self._get_teslamate_context(bearer_token, endpoint, auth_type)
-        params: Dict[str, Any] = {}
+        params: Dict[str, Any] = {"page": page, "show": show}
         if start_date:
             params["startDate"] = start_date
         if end_date:

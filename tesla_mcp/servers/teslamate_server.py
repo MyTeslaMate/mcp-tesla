@@ -7,7 +7,8 @@ TeslaMate surface self-contained and free of inline boilerplate.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+import os
+from typing import Any, Callable, Optional
 
 from fastmcp import Context, FastMCP
 
@@ -16,6 +17,65 @@ from ..modules.teslamateapi import TeslaMateAPIModule
 
 
 _TM_TAGS = {"teslamate"}
+
+# Safety cap when `fetch_all=True`: prevent runaway loops if the TeslaMate
+# API misbehaves. 20 pages × `show` per page (default 100) → 2 000 entries.
+_FETCH_ALL_MAX_PAGES = int(os.environ.get("TESLAMATE_MAX_PAGES", "20"))
+
+
+def _fetch_all_pages(
+    fn: Callable[..., dict[str, Any]],
+    *,
+    list_key: str,
+    id_key: str,
+    show: int,
+) -> dict[str, Any]:
+    """Page through `fn(page=N, show=S)` until a page returns fewer than
+    `show` entries. Dedupes on `id_key` (TeslaMate sometimes overlaps across
+    pages when records are inserted mid-pagination). Caps at
+    `_FETCH_ALL_MAX_PAGES`; sets `data.truncated=True` if the cap is hit
+    while the last page was still full.
+
+    `fn` must accept `page=` and `show=` kwargs and return the same envelope
+    as `teslamate_module.get_car_drives` / `_charges` —
+    ``{"data": {"car": …, "<list_key>": [...], "units": …}}``.
+    """
+    seen: set[Any] = set()
+    aggregated: list[Any] = []
+    car: dict[str, Any] = {}
+    units: dict[str, Any] = {}
+    last_page = 0
+    last_items_len = 0
+    for p in range(1, _FETCH_ALL_MAX_PAGES + 1):
+        last_page = p
+        chunk = fn(page=p, show=show)
+        data = chunk.get("data") if isinstance(chunk, dict) else None
+        if not isinstance(data, dict):
+            break
+        if not car:
+            car = data.get("car", {}) or {}
+        if not units:
+            units = data.get("units", {}) or {}
+        items = data.get(list_key, []) or []
+        last_items_len = len(items)
+        for item in items:
+            uid = item.get(id_key) if isinstance(item, dict) else None
+            if uid is None or uid in seen:
+                continue
+            seen.add(uid)
+            aggregated.append(item)
+        if last_items_len < show:
+            break
+    truncated = last_page == _FETCH_ALL_MAX_PAGES and last_items_len >= show
+    return {
+        "data": {
+            "car": car,
+            list_key: aggregated,
+            "units": units,
+            "pages_fetched": last_page,
+            "truncated": truncated,
+        }
+    }
 
 
 def build_teslamate_server(
@@ -60,20 +120,51 @@ def build_teslamate_server(
         ctx: Context,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        page: int = 1,
+        show: int = 100,
+        fetch_all: bool = False,
     ):
-        """Charging sessions for a specific car. Filter only by date range.
+        """Charging sessions for a specific car. Filter by date range.
+
+        TeslaMate paginates at 100 entries per call by default. Use `page`
+        / `show` to walk through manually, or `fetch_all=True` to let the
+        server auto-paginate (capped at ~20 pages of safety). Set
+        `fetch_all=True` for year-long counts or averages.
 
         Args:
             car_id: The TeslaMate car ID
             start_date: Optional start date in RFC3339 format (e.g., 2006-01-02T15:04:05Z)
             end_date: Optional end date in RFC3339 format
+            page: TeslaMate pagination — which page to fetch (default 1).
+            show: TeslaMate pagination — entries per page (default 100).
+            fetch_all: When True, auto-paginate from page 1 until
+                exhausted. Aggregated payload contains
+                `data.pages_fetched` and `data.truncated`.
         """
-        return execute(
-            teslamate_module.get_car_charges,
-            car_id=car_id,
-            start_date=start_date,
-            end_date=end_date,
-            **teslamate_auth_kwargs(ctx),
+        auth = teslamate_auth_kwargs(ctx)
+        if not fetch_all:
+            return execute(
+                teslamate_module.get_car_charges,
+                car_id=car_id,
+                start_date=start_date,
+                end_date=end_date,
+                page=page,
+                show=show,
+                **auth,
+            )
+        return _fetch_all_pages(
+            lambda *, page, show: execute(
+                teslamate_module.get_car_charges,
+                car_id=car_id,
+                start_date=start_date,
+                end_date=end_date,
+                page=page,
+                show=show,
+                **auth,
+            ),
+            list_key="charges",
+            id_key="charge_id",
+            show=show,
         )
 
     @tesla_tool(read_only=True, destructive=False, open_world=True, tags=_TM_TAGS)
@@ -112,8 +203,17 @@ def build_teslamate_server(
         end_date: Optional[str] = None,
         min_distance: Optional[float] = None,
         max_distance: Optional[float] = None,
+        page: int = 1,
+        show: int = 100,
+        fetch_all: bool = False,
     ):
         """Driving sessions for a specific car. Filter by date range or distance.
+
+        TeslaMate paginates at 100 entries per call by default. Use `page`
+        / `show` to walk through manually, or `fetch_all=True` to let the
+        server auto-paginate (capped at ~20 pages of safety). Set
+        `fetch_all=True` whenever the user asks for a count or average
+        across a long period (e.g. "combien de trajets en 2026").
 
         Args:
             car_id: The TeslaMate car ID
@@ -121,15 +221,40 @@ def build_teslamate_server(
             end_date: Optional end date in RFC3339 format
             min_distance: Optional minimum trip distance (TeslaMate units)
             max_distance: Optional maximum trip distance (TeslaMate units)
+            page: TeslaMate pagination — which page to fetch (default 1).
+            show: TeslaMate pagination — entries per page (default 100).
+            fetch_all: When True, auto-paginate from page 1 until
+                exhausted. Aggregated payload contains
+                `data.pages_fetched` and `data.truncated`.
         """
-        return execute(
-            teslamate_module.get_car_drives,
-            car_id=car_id,
-            start_date=start_date,
-            end_date=end_date,
-            min_distance=min_distance,
-            max_distance=max_distance,
-            **teslamate_auth_kwargs(ctx),
+        auth = teslamate_auth_kwargs(ctx)
+        if not fetch_all:
+            return execute(
+                teslamate_module.get_car_drives,
+                car_id=car_id,
+                start_date=start_date,
+                end_date=end_date,
+                min_distance=min_distance,
+                max_distance=max_distance,
+                page=page,
+                show=show,
+                **auth,
+            )
+        return _fetch_all_pages(
+            lambda *, page, show: execute(
+                teslamate_module.get_car_drives,
+                car_id=car_id,
+                start_date=start_date,
+                end_date=end_date,
+                min_distance=min_distance,
+                max_distance=max_distance,
+                page=page,
+                show=show,
+                **auth,
+            ),
+            list_key="drives",
+            id_key="drive_id",
+            show=show,
         )
 
     @tesla_tool(read_only=True, destructive=False, open_world=True, tags=_TM_TAGS)

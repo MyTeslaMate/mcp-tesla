@@ -34,10 +34,13 @@ Call `teslamate_get_car_drives` with:
 - `start_date`: 30 days ago in RFC3339 (e.g. `2026-04-06T00:00:00Z`)
 - `end_date`: now in RFC3339
 - `min_distance`: 5 (filters out parking-lot moves where Wh/km is meaningless)
+- `fetch_all`: `True` whenever the window is longer than ~1 month — the
+  TeslaMate API returns at most 100 entries per page, and the wrapper
+  will auto-paginate to give you the complete set.
 
 If the user specifies a different period (e.g. "this year", "last week"),
-use that instead. Always pass both `start_date` and `end_date` since the
-TeslaMate API filters by date only — no `limit`/`offset` are accepted.
+use that instead. Always pass both `start_date` and `end_date`. For a
+year-long window, `fetch_all=True` is mandatory or you'll undercount.
 
 ### 2. Compute per-drive efficiency
 
