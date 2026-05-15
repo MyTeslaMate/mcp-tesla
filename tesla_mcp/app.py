@@ -1894,7 +1894,7 @@ from mcp.types import TextContent as _DataRefTextContent  # noqa: F401
 _DATA_REF_PREFIX = "mtm:"
 _DATA_REF_TTL = int(os.environ.get("GENERATIVE_DATA_REF_TTL", "300"))
 _DATA_REF_MAXSIZE = int(os.environ.get("GENERATIVE_DATA_REF_MAXSIZE", "512"))
-_DATA_REF_MAX_PAYLOAD = int(os.environ.get("GENERATIVE_DATA_REF_MAX_PAYLOAD", "200000"))
+_DATA_REF_MAX_PAYLOAD = int(os.environ.get("GENERATIVE_DATA_REF_MAX_PAYLOAD", "5000000"))
 
 
 class _DataRefCache:
