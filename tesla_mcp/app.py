@@ -2379,42 +2379,6 @@ class TagFilteringMiddleware(Middleware):
 
 mcp.add_middleware(TagFilteringMiddleware()) # add the middleware to the FastMCP app
 
-
-class SessionInstructionsMiddleware(Middleware):
-    """Append per-session context (MTM user id, active subscriptions) to the static
-    server `instructions` returned in the MCP `initialize` handshake."""
-
-    async def on_initialize(self, context: MiddlewareContext, call_next):
-        result = await call_next(context)
-        if result is None:
-            return result
-        try:
-            request = context.fastmcp_context.request_context.request
-            user = getattr(request, "user", None)
-            token = getattr(user, "access_token", None) if user else None
-            if token is None:
-                return result
-            claims = token.claims or {}
-            extras: list[str] = []
-            user_id = getattr(token, "client_id", None)
-            if user_id and user_id != "unknown":
-                extras.append(f"Authenticated MyTeslaMate user id: {user_id}.")
-            features: list[str] = []
-            if claims.get("subscribe_api"):
-                features.append("Tesla Fleet API")
-            if claims.get("subscribe_teslamate"):
-                features.append("TeslaMate")
-            if features:
-                extras.append("Active subscriptions: " + ", ".join(features) + ".")
-            if extras:
-                result.instructions = (result.instructions or "") + "\n\n" + " ".join(extras)
-        except Exception:
-            logger.exception("SessionInstructionsMiddleware: failed to personalize instructions")
-        return result
-
-
-mcp.add_middleware(SessionInstructionsMiddleware())
-
 if __name__ == "__main__":
     mcp.run(transport="streamable-http", port=mcp_port)
 else:
