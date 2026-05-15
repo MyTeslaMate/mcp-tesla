@@ -111,11 +111,7 @@ produces:
 - A `Heading` with the period.
 - Three `Metric` cards: median Wh/km, best Wh/km, worst Wh/km.
 - A `DataTable` of the top 5 outliers (date, distance, Wh/km, avg speed).
-- A `Text` block with the 1–3 coaching insights you derived.
-
-Pass the computed numbers via the `data=` argument so they're available
-as globals in the sandbox. Do not return a plain text answer — the user
-ran the coach because they want the visual report.
+- 1–3 `Metric` cards per coaching insights you derived.
 
 ## Pitfalls
 
