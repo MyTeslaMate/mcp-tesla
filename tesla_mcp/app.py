@@ -129,11 +129,32 @@ openai_apps_challenge_token = os.environ.get(
     "mjfI5TvAUa5hL6MtblBT5Q_6Vg1Y8qEltcPyIor5Cz4",
 )
 _tesla_oauth_client_id = os.environ.get("TESLA_OAUTH_CLIENT_ID")
+
+BASE_INSTRUCTIONS = (
+    "MyTeslaMate MCP — control and inspect Tesla vehicles and energy products via the "
+    "official Tesla Fleet API, and query historical drive/charge analytics via TeslaMate.\n\n"
+    "At conversation start, call `list_vehicles_and_energy_sites` to discover the products "
+    "on this account; use the returned `id`/`vin` as `vehicle_tag` for subsequent commands. "
+    "Use `get_user_info` for account profile details. Most vehicle commands require an "
+    "awake vehicle — call `wake_up_vehicle` first if a command fails with an offline/sleep "
+    "error.\n\n"
+    "Tool categories:\n"
+    "- Live data & state: `get_vehicle`, `get_vehicle_data`\n"
+    "- Vehicle commands (locks, climate, charging, navigation, …): destructive — confirm "
+    "intent before calling.\n"
+    "- Energy products: `energy_live_status`, `energy_history`, `energy_storm_mode`, …\n"
+    "- Historical analytics (TeslaMate): `teslamate_get_cars`, `teslamate_get_car_drives`, "
+    "`teslamate_get_car_charges`, …\n\n"
+    "Always summarise tool results in natural language; widgets render automatically where "
+    "available."
+)
+
 mcp = FastMCP(
     "MyTeslaMate MCP",
     auth=TeslaProvider() if _tesla_oauth_client_id else None,
     icons=_build_app_icons(),
     website_url="https://app.myteslamate.com",
+    instructions=BASE_INSTRUCTIONS,
 )
 client = TeslaClient()
 vehicle_module = VehicleEndpoints(client)
@@ -2357,6 +2378,42 @@ class TagFilteringMiddleware(Middleware):
         return [tool for tool in result if bool(tool.tags & tags)] # if the tool's tags intersect with the requested tags
 
 mcp.add_middleware(TagFilteringMiddleware()) # add the middleware to the FastMCP app
+
+
+class SessionInstructionsMiddleware(Middleware):
+    """Append per-session context (MTM user id, active subscriptions) to the static
+    server `instructions` returned in the MCP `initialize` handshake."""
+
+    async def on_initialize(self, context: MiddlewareContext, call_next):
+        result = await call_next(context)
+        if result is None:
+            return result
+        try:
+            request = context.fastmcp_context.request_context.request
+            user = getattr(request, "user", None)
+            token = getattr(user, "access_token", None) if user else None
+            if token is None:
+                return result
+            claims = token.claims or {}
+            extras: list[str] = []
+            user_id = getattr(token, "client_id", None)
+            if user_id and user_id != "unknown":
+                extras.append(f"Authenticated MyTeslaMate user id: {user_id}.")
+            features: list[str] = []
+            if claims.get("subscribe_api"):
+                features.append("Tesla Fleet API")
+            if claims.get("subscribe_teslamate"):
+                features.append("TeslaMate")
+            if features:
+                extras.append("Active subscriptions: " + ", ".join(features) + ".")
+            if extras:
+                result.instructions = (result.instructions or "") + "\n\n" + " ".join(extras)
+        except Exception:
+            logger.exception("SessionInstructionsMiddleware: failed to personalize instructions")
+        return result
+
+
+mcp.add_middleware(SessionInstructionsMiddleware())
 
 if __name__ == "__main__":
     mcp.run(transport="streamable-http", port=mcp_port)
