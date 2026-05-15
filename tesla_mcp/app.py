@@ -2044,6 +2044,22 @@ def _extract_data_ref(data: object) -> str | None:
     return None
 
 
+def _maybe_decode_json_arg(value: object) -> object:
+    """Some providers (notably DeepSeek) occasionally encode object-shaped
+    function arguments as JSON strings instead of native objects. Normalise
+    here so downstream ref-resolution and shape checks see the intended dict.
+    """
+    if not isinstance(value, str):
+        return value
+    s = value.strip()
+    if not s or s[0] not in ("{", "["):
+        return value
+    try:
+        return _json.loads(s)
+    except (TypeError, ValueError):
+        return value
+
+
 class DataRefMiddleware(Middleware):
     """Cache non-generative tool outputs + resolve refs for the generative tool.
 
@@ -2084,6 +2100,13 @@ class DataRefMiddleware(Middleware):
         is missing/expired, `missing_refs` is populated and the caller should
         surface an `isError` result instead of running the tool.
         """
+        # Unwrap JSON-string args (e.g. DeepSeek encoding `{"__ref__":"mtm:..."}`
+        # as a string literal). This lets the rest of the resolver treat it as
+        # the dict the model intended.
+        decoded = _maybe_decode_json_arg(data)
+        json_unwrapped = decoded is not data
+        data = decoded
+
         # Shape (1) and (2): whole-data ref.
         whole_ref = _extract_data_ref(data)
         if whole_ref:
@@ -2137,6 +2160,12 @@ class DataRefMiddleware(Middleware):
                 return _UNCHANGED, missing
             if changed:
                 return resolved_dict, []
+
+        # No refs to resolve, but we decoded a JSON-string arg — return the
+        # decoded value so the caller can replace the original string with
+        # the native object the tool's schema expects.
+        if json_unwrapped:
+            return data, []
 
         return _UNCHANGED, []
 
