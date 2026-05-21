@@ -109,7 +109,7 @@ class TeslaTokenVerifier(TokenVerifier):
         subscribe_api = bool(data.get("subscribe_api", False))
         subscribe_teslamate = bool(data.get("subscribe_teslamate", False))
         teslamate_api_endpoint = data.get("teslamate_api_endpoint", "")
-        teslamate_auth_type = (data.get("auth_type") or "bearer").lower()
+        teslamate_auth_type = (data.get("auth_type") or "").lower()
         _token_map[token] = {
             "mtm_token": mtm_token,
             "subscribe_api": subscribe_api,
