@@ -102,17 +102,6 @@ Pick the 1–3 most actionable insights, written as direct advice:
 Avoid generic platitudes. Anchor each insight in a concrete number derived
 from the user's own data.
 
-### 7. Render (always)
-
-Always finish with a Generative UI render — this skill is meant to be
-visual. Call `generative_generate_prefab_ui` with Python code that
-produces:
-
-- A `Heading` with the period.
-- Three `Metric` cards: median Wh/km, best Wh/km, worst Wh/km.
-- A `DataTable` of the top 5 outliers (date, distance, Wh/km, avg speed).
-- 1–3 `Metric` cards per coaching insights you derived.
-
 ## Pitfalls
 
 - **Short drives mislead.** Drives < 5 km are dominated by climate/start-up
