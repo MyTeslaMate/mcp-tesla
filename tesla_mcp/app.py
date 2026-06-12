@@ -146,7 +146,23 @@ BASE_INSTRUCTIONS = (
     "- Historical analytics (TeslaMate): `teslamate_get_cars`, `teslamate_get_car_drives`, "
     "`teslamate_get_car_charges`, …\n\n"
     "Always summarise tool results in natural language; widgets render automatically where "
-    "available."
+    "available.\n\n"
+    "## Prefab UI conventions (when generating UI)\n\n"
+    "Before generating any Prefab UI code, ALWAYS call "
+    "`generative_search_prefab_components` to discover the components currently "
+    "available — the library evolves and richer components ship regularly. Pick the most "
+    "relevant ones for the data and insights you want to surface; err on the side of MORE "
+    "components rather than fewer.\n\n"
+    "Layout: always use `Dashboard` as the outermost container with `DashboardItem` "
+    "children for placement — this guarantees a clean, responsive layout.\n\n"
+    "Preferred component set (use these when several options fit equally):\n"
+    "- Charts : RadarChart, PieChart, LineChart, AreaChart\n"
+    "- Data   : DataTable, Progress, Metric\n"
+    "- Display: Badge, Card, Label\n"
+    "- Geo    : `show_map` for trip routes, charging-stop maps or any address-based view\n\n"
+    "These are preferences, not bans. If discovery surfaces a component that fits the data "
+    "better (e.g. ScatterChart for correlation, Histogram for distribution), use it. The "
+    "goal is a sexy, information-dense report — not strict adherence to a list."
 )
 
 mcp = FastMCP(
@@ -1541,9 +1557,13 @@ def get_user_orders(ctx: Context):
 
 from .servers.teslamate_server import build_teslamate_server
 from .servers.teslamate_apps import build_teslamate_apps_server
+from .servers.map_apps import build_map_apps_server
 
 mcp.mount(build_teslamate_server(teslamate_module, app_csp=APP_CSP), namespace="teslamate")
 mcp.mount(build_teslamate_apps_server(teslamate_module, app_csp=APP_CSP), namespace="teslamate")
+# Mounted at the root (no namespace) so the exposed tool name stays
+# `show_map` — shorter, more discoverable than `geo_show_map`.
+mcp.mount(build_map_apps_server(app_csp=APP_CSP))
 
 # === Skills (markdown workflows the LLM reads on demand) ===
 from fastmcp.server.providers.skills import SkillsDirectoryProvider

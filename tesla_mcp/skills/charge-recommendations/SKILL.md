@@ -103,20 +103,43 @@ derived from this user's data.
 
 ### 5. Output format
 
-Plain markdown — no chart calls, no widget calls. Structure:
+1. **Markdown summary** (short, scannable):
+   - One-line context: current period, number of sessions, total kWh,
+     and the headline delta vs previous period (e.g. "+12% kWh,
+     supercharger share 18% → 31%").
+   - The 1–3 recommendations as a bulleted list, each one with:
+     - a short headline (the change to make),
+     - the data point that triggered it, **with the previous-period
+       value for comparison whenever available**,
+     - the expected benefit (cost, battery, or time).
+   - Optional one-line positive note if a habit visibly improved.
 
-1. One-line context: current period, number of sessions, total kWh, and
-   the headline delta vs previous period (e.g. "+12% kWh, supercharger
-   share 18% → 31%").
-2. The 1–3 recommendations as a bulleted list, each one with:
-   - a short headline (the change to make),
-   - the data point that triggered it, **with the previous-period value
-     for comparison whenever available**,
-   - the expected benefit (cost, battery, or time).
-3. Optional one-line positive note if a habit visibly improved.
+2. **Then render the recommendations as a Prefab UI Dashboard**.
+   - First call `generative_search_prefab_components` to discover the
+     components currently available — newer / richer ones may exist.
+   - Then call `generative_generate_prefab_ui` with a **Dashboard**
+     layout (outermost) wrapping the components that best illustrate
+     the recommendations. Better too many components than too few.
 
-Keep the whole answer tight — recommendations are the product, not the
-breakdown.
+   Lean into whatever discovery returned, prioritising:
+
+   - `Metric` cards for the key numbers anchoring each tip (with the
+     previous-period number as a delta where you have it).
+   - `Progress` for ratios (e.g. "night-charging share").
+   - `AreaChart` / `LineChart` for cost / kWh trends supporting the tip.
+   - `PieChart` for breakdowns (home / supercharger / other, peak /
+     off-peak, …).
+   - `RadarChart` for multi-axis habit comparisons (cost, SoC range,
+     night share, fast-charging share — normalised).
+   - `DataTable` for the underlying sessions if useful.
+   - `Badge` for verdicts ("improving", "drifting", "stable") and
+     `Label` for compact captions.
+   - `show_map` if you want to map home vs supercharger stops —
+     addresses are in `address` / `geofence`.
+
+   Follow the global Prefab UI conventions from the MCP server
+   instructions: Dashboard outermost, discovery-first, favourite set
+   when several options fit equally.
 
 ## Pitfalls
 

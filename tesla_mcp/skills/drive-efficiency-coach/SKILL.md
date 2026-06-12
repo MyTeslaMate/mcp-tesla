@@ -105,13 +105,34 @@ from the user's own data.
 ### 7. Render (always)
 
 Always finish with a Generative UI render — this skill is meant to be
-visual. Call `generative_generate_prefab_ui` with Python code that
-produces:
+visual.
 
-- A `Heading` with the period.
-- Three `Metric` cards: median Wh/km, best Wh/km, worst Wh/km.
-- A `DataTable` of the top 5 outliers (date, distance, Wh/km, avg speed).
-- 1–3 `Metric` cards per coaching insights you derived.
+1. First call `generative_search_prefab_components` to discover the
+   components currently available. The library evolves — newer or
+   richer components may exist than what you remember.
+2. Then call `generative_generate_prefab_ui` with a **Dashboard** layout
+   (outermost). Pick the components that best surface your insights —
+   better too many components than too few. Tesla owners want patterns
+   and actionable cues, so favour rich visuals.
+
+Lean into whatever discovery returned, prioritising:
+
+- `RadarChart` for multi-axis comparisons (efficiency vs speed vs
+  altitude vs temperature, normalised).
+- `LineChart` / `AreaChart` for the efficiency trend over the period.
+- `PieChart` for breakdowns (city / mixed / highway, cold / mild / hot).
+- `Metric` cards for the headline KPIs you computed (median, best,
+  worst, and each coaching insight's anchor number).
+- `Progress` when an insight is a ratio relative to a target.
+- `DataTable` for the top outliers worth inspecting.
+- `Badge` to mark verdicts (best / worst / improving / regressing) and
+  `Label` for compact captions.
+- `show_map` if you want to put the outlier drives' start/end on a
+  map — addresses are in `start_address` / `end_address`.
+
+Follow the global Prefab UI conventions listed in the MCP server
+instructions: Dashboard outermost, discovery-first, favourite component
+set when several options fit equally.
 
 ## Pitfalls
 
