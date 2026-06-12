@@ -162,13 +162,15 @@ def build_map_apps_server(app_csp: dict | None = None) -> FastMCP:
             else:
                 failed.append(loc)
 
-        # Dashboard defaults to 12 columns; DashboardItem defaults to
-        # col=1, col_span=1 → 1/12 width, which squeezes the map into a
-        # ~80 px column. We explicitly span the full grid (col_span=12)
-        # on each row so the map and the DataTable both take the full
-        # available width and stack vertically (row 1 then row 2).
+        # Dashboard defaults to 12 columns and `row_height=120` px;
+        # DashboardItem defaults to col_span=1, row_span=1 → 1/12 width
+        # and a fixed 120 px row. Two side effects to neutralise:
+        # 1. col_span=12 on each item so they take the full width.
+        # 2. row_height="auto" on the Dashboard so the 500 px map iframe
+        #    doesn't overflow into the row below where the DataTable
+        #    sits (which was producing a stacked-overlay look).
         with PrefabApp() as app:
-            with Dashboard(columns=12, gap=4):
+            with Dashboard(columns=12, row_height="auto", gap=4):
                 with DashboardItem(col=1, row=1, col_span=12):
                     with Card():
                         with CardHeader():
