@@ -162,9 +162,14 @@ def build_map_apps_server(app_csp: dict | None = None) -> FastMCP:
             else:
                 failed.append(loc)
 
+        # Dashboard defaults to 12 columns; DashboardItem defaults to
+        # col=1, col_span=1 → 1/12 width, which squeezes the map into a
+        # ~80 px column. We explicitly span the full grid (col_span=12)
+        # on each row so the map and the DataTable both take the full
+        # available width and stack vertically (row 1 then row 2).
         with PrefabApp() as app:
-            with Dashboard():
-                with DashboardItem():
+            with Dashboard(columns=12, gap=4):
+                with DashboardItem(col=1, row=1, col_span=12):
                     with Card():
                         with CardHeader():
                             CardTitle(title)
@@ -184,7 +189,7 @@ def build_map_apps_server(app_csp: dict | None = None) -> FastMCP:
                             Badge(f"Could not find: {f}", variant="destructive")
 
                 if geocoded:
-                    with DashboardItem():
+                    with DashboardItem(col=1, row=2, col_span=12):
                         DataTable(
                             columns=[
                                 DataTableColumn(key="name", header="Name", sortable=True),
