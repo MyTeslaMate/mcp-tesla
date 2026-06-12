@@ -33,7 +33,10 @@ from prefab_ui.components import (
 from ..auth_context import make_tesla_tool
 
 
-_MAP_TAGS = {"map", "ui", "geo"}
+# Includes `teslamate` so the tool flows through the existing
+# `?tags=teslamate,generative` filter the Laravel bridge uses — without
+# requiring callers to extend their tag query for one extra tool.
+_MAP_TAGS = {"teslamate", "map", "ui", "geo"}
 _NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 
 
