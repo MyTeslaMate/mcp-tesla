@@ -36,6 +36,29 @@ spec:
                 name: mcp-config
           ports:
             - containerPort: 80
+          resources:
+            requests:
+              cpu: {{ .Values.resources.requests.cpu | default "100m" }}
+              memory: {{ .Values.resources.requests.memory | default "512Mi" }}
+            limits:
+              cpu: {{ .Values.resources.limits.cpu | default "2" }}
+              memory: {{ .Values.resources.limits.memory | default "4Gi" }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
           volumeMounts:
             - name: fastmcp-data
               mountPath: /root/.local/share/fastmcp

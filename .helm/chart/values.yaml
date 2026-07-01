@@ -4,6 +4,14 @@ global:
 
 host: localhost
 
+resources:
+  requests:
+    cpu: "100m"
+    memory: "512Mi"
+  limits:
+    cpu: "2"
+    memory: "4Gi"
+
 keys:
   TESLA_BASE_URL: "https://api.myteslamate.com/"
   TESLA_BYPASS: ""

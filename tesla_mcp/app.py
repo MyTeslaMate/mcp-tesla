@@ -1935,6 +1935,12 @@ _DATA_REF_PREFIX = "mtm:"
 _DATA_REF_TTL = int(os.environ.get("GENERATIVE_DATA_REF_TTL", "300"))
 _DATA_REF_MAXSIZE = int(os.environ.get("GENERATIVE_DATA_REF_MAXSIZE", "512"))
 _DATA_REF_MAX_PAYLOAD = int(os.environ.get("GENERATIVE_DATA_REF_MAX_PAYLOAD", "5000000"))
+# Max payload we're willing to INJECT into the Pyodide sandbox on resolution.
+# Incident 2026-07-01: a 892KB `get_car_drives` ref injected into
+# `generative_generate_prefab_ui` made the sandbox subprocess hang (no
+# timeout on the underlying `proc.stdout.readline()`), blocking every
+# subsequent generative call until the pod was killed manually.
+_DATA_REF_MAX_INJECTED = int(os.environ.get("GENERATIVE_DATA_REF_MAX_INJECTED", "204800"))
 
 
 class _DataRefCache:
@@ -2121,6 +2127,32 @@ class DataRefMiddleware(Middleware):
     }
     _BANNER_PREFIX = "[data_ref="
 
+    @staticmethod
+    def _guard_injected_size(ref: str, cached: str) -> None:
+        """Reject payloads too large for the Pyodide sandbox to handle
+        without hanging. See incident 2026-07-01: an 892KB `get_car_drives`
+        ref hung `PyodideSandbox.run()` (no timeout on subprocess readline).
+
+        Raised as ToolError so the LLM sees a clear, actionable message
+        and can re-fetch with a narrower query instead of retrying blindly.
+        """
+        if len(cached) <= _DATA_REF_MAX_INJECTED:
+            return
+        logger.warning(
+            "[data_ref] REJECT %s: payload %d chars > %d limit",
+            ref, len(cached), _DATA_REF_MAX_INJECTED,
+        )
+        raise _DataRefToolError(
+            f"data_ref '{ref}' payload is {len(cached):,} characters, "
+            f"exceeds the {_DATA_REF_MAX_INJECTED:,} char limit for "
+            f"generative_generate_prefab_ui rendering. The sandbox cannot "
+            f"safely process payloads this large. "
+            f"Re-fetch the source data with a narrower query — fewer days, "
+            f"filter by a specific vehicle/client, or aggregate before "
+            f"passing to the generative UI tool. Consider pre-computing "
+            f"totals/averages server-side rather than sending the raw dataset."
+        )
+
     def _resolve_data_refs(
         self,
         data: object,
@@ -2153,6 +2185,7 @@ class DataRefMiddleware(Middleware):
             cached = _data_ref_cache.get(session_key, whole_ref) if session_key else None
             if cached is None:
                 return _UNCHANGED, [whole_ref]
+            self._guard_injected_size(whole_ref, cached)
             try:
                 parsed = _json.loads(cached)
             except (TypeError, ValueError):
@@ -2174,6 +2207,7 @@ class DataRefMiddleware(Middleware):
                     if cached is None:
                         missing.append(value)
                         continue
+                    self._guard_injected_size(value, cached)
                     try:
                         parsed = _json.loads(cached)
                     except (TypeError, ValueError):
