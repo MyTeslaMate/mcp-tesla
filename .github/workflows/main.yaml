@@ -4,6 +4,7 @@ on:
       - tesla_mcp/**
       - .github/**
       - Dockerfile
+      - requirements.txt
     branches:
       - master
 
