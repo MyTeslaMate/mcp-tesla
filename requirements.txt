@@ -1,4 +1,5 @@
 #mcp>=0.1.0
 requests>=2.31.0
 uvicorn[standard]
-fastmcp[apps]>=3.2.4httpx>=0.28
+fastmcp[apps]>=3.2.4
+httpx>=0.28
