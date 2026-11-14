@@ -6,7 +6,19 @@ import os
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
-from ..base import TeslaClient, TeslaModule, TeslaRequestContext
+from ..base import TeslaAPIError, TeslaClient, TeslaModule, TeslaRequestContext
+
+# Returned to the LLM when the tenant has no TeslaMate API pod: the ingress
+# answers a bare 404 for an instance whose "TeslaMate API & MQTT" option is
+# off. Without this, the model sees an opaque 404 and invents a cause
+# (expired token, wrong car id).
+TESLAMATE_API_DISABLED_MESSAGE = (
+    "The TeslaMate API is not enabled on this user's MyTeslaMate instance, so no "
+    "TeslaMate data (cars, drives, charges, battery health, status) can be read. "
+    "This is not a token problem: do not ask the user to renew or regenerate a token. "
+    "Tell the user to enable it at https://app.myteslamate.com/service, section "
+    "'Connectivity: TeslaMate API & MQTT', button 'Enable', then retry in a minute."
+)
 
 
 class TeslaMateAPIModule(TeslaModule):
@@ -36,6 +48,16 @@ class TeslaMateAPIModule(TeslaModule):
             base.basic_auth_password = bearer_token
         return base
 
+    def _get(self, path: str, *, context: TeslaRequestContext, params: Optional[Dict[str, Any]] = None) -> Any:
+        try:
+            return self.client.get(path, context=context, params=params)
+        except TeslaAPIError as exc:
+            # The TeslaMate API's own 404s are JSON (e.g. PAGE_NOT_FOUND); a
+            # 404 with no JSON body comes from the ingress, i.e. no API pod.
+            if exc.status_code == 404 and not exc.payload:
+                raise RuntimeError(TESLAMATE_API_DISABLED_MESSAGE) from exc
+            raise
+
     def get_cars(self, *, bearer_token: str, endpoint: str, auth_type: str = "bearer") -> Dict[str, Any]:
         """
         Get all cars from TeslaMate.
@@ -44,7 +66,7 @@ class TeslaMateAPIModule(TeslaModule):
             List of cars with their basic information
         """
         context = self._get_teslamate_context(bearer_token, endpoint, auth_type)
-        return self.client.get("/api/v1/cars", context=context)
+        return self._get("/api/v1/cars", context=context)
 
     def get_car(self, car_id: int, *, bearer_token: str, endpoint: str, auth_type: str = "bearer") -> Dict[str, Any]:
         """
@@ -57,7 +79,7 @@ class TeslaMateAPIModule(TeslaModule):
             Detailed car information
         """
         context = self._get_teslamate_context(bearer_token, endpoint, auth_type)
-        return self.client.get(f"/api/v1/cars/{car_id}", context=context)
+        return self._get(f"/api/v1/cars/{car_id}", context=context)
 
     def get_car_battery_health(self, car_id: int, *, bearer_token: str, endpoint: str, auth_type: str = "bearer") -> Dict[str, Any]:
         """
@@ -70,7 +92,7 @@ class TeslaMateAPIModule(TeslaModule):
             Battery health data including degradation information
         """
         context = self._get_teslamate_context(bearer_token, endpoint, auth_type)
-        return self.client.get(f"/api/v1/cars/{car_id}/battery-health", context=context)
+        return self._get(f"/api/v1/cars/{car_id}/battery-health", context=context)
 
     def get_car_charges(
         self,
@@ -105,7 +127,7 @@ class TeslaMateAPIModule(TeslaModule):
         if end_date:
             params["endDate"] = end_date
 
-        return self.client.get(f"/api/v1/cars/{car_id}/charges", context=context, params=params)
+        return self._get(f"/api/v1/cars/{car_id}/charges", context=context, params=params)
 
     def get_car_charge(
         self,
@@ -127,7 +149,7 @@ class TeslaMateAPIModule(TeslaModule):
             Detailed charging session information
         """
         context = self._get_teslamate_context(bearer_token, endpoint, auth_type)
-        return self.client.get(f"/api/v1/cars/{car_id}/charges/{charge_id}", context=context)
+        return self._get(f"/api/v1/cars/{car_id}/charges/{charge_id}", context=context)
 
     def get_car_charges_current(
         self,
@@ -147,7 +169,7 @@ class TeslaMateAPIModule(TeslaModule):
             Current charging session information, or empty if not charging
         """
         context = self._get_teslamate_context(bearer_token, endpoint, auth_type)
-        return self.client.get(f"/api/v1/cars/{car_id}/charges/current", context=context)
+        return self._get(f"/api/v1/cars/{car_id}/charges/current", context=context)
 
     def get_car_drives(
         self,
@@ -190,7 +212,7 @@ class TeslaMateAPIModule(TeslaModule):
         if max_distance is not None:
             params["maxDistance"] = max_distance
 
-        return self.client.get(f"/api/v1/cars/{car_id}/drives", context=context, params=params)
+        return self._get(f"/api/v1/cars/{car_id}/drives", context=context, params=params)
 
     def get_car_drive(
         self, 
@@ -212,7 +234,7 @@ class TeslaMateAPIModule(TeslaModule):
             Detailed driving session information
         """
         context = self._get_teslamate_context(bearer_token, endpoint, auth_type)
-        return self.client.get(f"/api/v1/cars/{car_id}/drives/{drive_id}", context=context)
+        return self._get(f"/api/v1/cars/{car_id}/drives/{drive_id}", context=context)
 
     def get_car_status(self, car_id: int, *, bearer_token: str, endpoint: str, auth_type: str = "bearer") -> Dict[str, Any]:
         """
@@ -225,7 +247,7 @@ class TeslaMateAPIModule(TeslaModule):
             Current car status information
         """
         context = self._get_teslamate_context(bearer_token, endpoint, auth_type)
-        return self.client.get(f"/api/v1/cars/{car_id}/status", context=context)
+        return self._get(f"/api/v1/cars/{car_id}/status", context=context)
 
     def get_car_updates(self, car_id: int, *, bearer_token: str, endpoint: str, auth_type: str = "bearer") -> Dict[str, Any]:
         """
@@ -238,5 +260,5 @@ class TeslaMateAPIModule(TeslaModule):
             Software updates information
         """
         context = self._get_teslamate_context(bearer_token, endpoint, auth_type)
-        return self.client.get(f"/api/v1/cars/{car_id}/updates", context=context)
+        return self._get(f"/api/v1/cars/{car_id}/updates", context=context)
 
