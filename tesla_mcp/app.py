@@ -884,22 +884,43 @@ def set_scheduled_charging(ctx: Context, vehicle_tag: str, enable: bool, time: i
 def add_charge_schedule(
     ctx: Context,
     vehicle_tag: str,
-    time: str,
-    latitude: float,
-    longitude: float,
-    name: Optional[str] = None,
-    one_time: Optional[bool] = None,
+    lat: float,
+    lon: float,
+    start_time: Optional[int] = None,
+    end_time: Optional[int] = None,
+    days_of_week: str = "All",
+    enabled: bool = True,
+    one_time: bool = False,
+    schedule_id: Optional[int] = None,
 ):
-    """Add a charge schedule."""
+    """
+    Add or modify a charge schedule.
+
+    Args:
+        lat: Latitude of the charging location
+        lon: Longitude of the charging location
+        start_time: Charge start, minutes after midnight vehicle local time (e.g. 1380 = 23:00)
+        end_time: Charge end, minutes after midnight vehicle local time (e.g. 360 = 06:00)
+        days_of_week: "All", or a comma-separated list such as "Mon,Tues,Wed,Thurs,Fri"
+        enabled: Whether the schedule is active
+        one_time: Run once instead of repeating
+        schedule_id: Id of an existing schedule to modify (omit to create a new one)
+
+    At least one of start_time and end_time is required. Existing schedules are
+    listed in vehicle_data under charge_schedule_data.
+    """
     bearer_token = _extract_bearer_token(ctx)
     return _execute(
         commands_module.add_charge_schedule,
         vehicle_tag=vehicle_tag,
-        time=time,
-        latitude=latitude,
-        longitude=longitude,
-        name=name,
+        lat=lat,
+        lon=lon,
+        start_time=start_time,
+        end_time=end_time,
+        days_of_week=days_of_week,
+        enabled=enabled,
         one_time=one_time,
+        schedule_id=schedule_id,
         bearer_token=bearer_token,
     )
 
@@ -917,22 +938,39 @@ def remove_charge_schedule(ctx: Context, vehicle_tag: str, schedule_id: int):
 def add_precondition_schedule(
     ctx: Context,
     vehicle_tag: str,
-    time: str,
-    latitude: float,
-    longitude: float,
-    name: Optional[str] = None,
-    one_time: Optional[bool] = None,
+    precondition_time: int,
+    lat: float,
+    lon: float,
+    days_of_week: str = "All",
+    enabled: bool = True,
+    one_time: bool = False,
+    schedule_id: Optional[int] = None,
 ):
-    """Add a precondition schedule."""
+    """
+    Add or modify a precondition schedule.
+
+    Args:
+        precondition_time: Departure time, minutes after midnight vehicle local time (e.g. 450 = 07:30)
+        lat: Latitude of the departure location
+        lon: Longitude of the departure location
+        days_of_week: "All", or a comma-separated list such as "Mon,Tues,Wed,Thurs,Fri"
+        enabled: Whether the schedule is active
+        one_time: Run once instead of repeating
+        schedule_id: Id of an existing schedule to modify (omit to create a new one)
+
+    Existing schedules are listed in vehicle_data under preconditioning_schedule_data.
+    """
     bearer_token = _extract_bearer_token(ctx)
     return _execute(
         commands_module.add_precondition_schedule,
         vehicle_tag=vehicle_tag,
-        time=time,
-        latitude=latitude,
-        longitude=longitude,
-        name=name,
+        precondition_time=precondition_time,
+        lat=lat,
+        lon=lon,
+        days_of_week=days_of_week,
+        enabled=enabled,
         one_time=one_time,
+        schedule_id=schedule_id,
         bearer_token=bearer_token,
     )
 

@@ -269,19 +269,40 @@ class VehicleCommandsModule(TeslaModule):
         self,
         vehicle_tag: str,
         *,
-        time: str,
-        latitude: float,
-        longitude: float,
+        lat: float,
+        lon: float,
         bearer_token: str,
-        name: Optional[str] = None,
-        one_time: Optional[bool] = None,
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None,
+        days_of_week: str = "All",
+        enabled: bool = True,
+        one_time: bool = False,
+        schedule_id: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Add a charge schedule."""
-        payload = {"time": time, "latitude": latitude, "longitude": longitude}
-        if name:
-            payload["name"] = name
-        if one_time is not None:
-            payload["one_time"] = one_time
+        """
+        Add or modify a charge schedule.
+
+        Payload follows Tesla's vehicle-command proxy: lat/lon, start_time and
+        end_time in minutes after midnight, start_enabled/end_enabled derived from
+        which times are given, days_of_week as "All" or "Mon,Tues,...".
+        """
+        if start_time is None and end_time is None:
+            raise ValueError("add_charge_schedule needs start_time, end_time or both")
+        payload: Dict[str, Any] = {
+            "lat": lat,
+            "lon": lon,
+            "days_of_week": days_of_week,
+            "enabled": enabled,
+            "one_time": one_time,
+            "start_enabled": start_time is not None,
+            "end_enabled": end_time is not None,
+        }
+        if start_time is not None:
+            payload["start_time"] = start_time
+        if end_time is not None:
+            payload["end_time"] = end_time
+        if schedule_id is not None:
+            payload["id"] = schedule_id
         return self._command(vehicle_tag, "add_charge_schedule", bearer_token=bearer_token, payload=payload)
 
     def remove_charge_schedule(
@@ -296,19 +317,31 @@ class VehicleCommandsModule(TeslaModule):
         self,
         vehicle_tag: str,
         *,
-        time: str,
-        latitude: float,
-        longitude: float,
+        precondition_time: int,
+        lat: float,
+        lon: float,
         bearer_token: str,
-        name: Optional[str] = None,
-        one_time: Optional[bool] = None,
+        days_of_week: str = "All",
+        enabled: bool = True,
+        one_time: bool = False,
+        schedule_id: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Add a precondition schedule."""
-        payload = {"time": time, "latitude": latitude, "longitude": longitude}
-        if name:
-            payload["name"] = name
-        if one_time is not None:
-            payload["one_time"] = one_time
+        """
+        Add or modify a precondition schedule.
+
+        Payload follows Tesla's vehicle-command proxy: precondition_time in
+        minutes after midnight, lat/lon, days_of_week as "All" or "Mon,Tues,...".
+        """
+        payload: Dict[str, Any] = {
+            "precondition_time": precondition_time,
+            "lat": lat,
+            "lon": lon,
+            "days_of_week": days_of_week,
+            "enabled": enabled,
+            "one_time": one_time,
+        }
+        if schedule_id is not None:
+            payload["id"] = schedule_id
         return self._command(vehicle_tag, "add_precondition_schedule", bearer_token=bearer_token, payload=payload)
 
     def remove_precondition_schedule(
